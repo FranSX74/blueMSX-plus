@@ -107,6 +107,7 @@ target_compile_options(bluemsx-core PUBLIC "SHELL:-include ${BMX_COMPAT_HEADER}"
 target_compile_options(bluemsx-core PRIVATE -w
     $<$<COMPILE_LANG_AND_ID:C,GNU>:-fpermissive>
     $<$<COMPILE_LANG_AND_ID:C,Clang>:-Wno-incompatible-pointer-types -Wno-int-conversion -Wno-implicit-function-declaration>
+    $<$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>:-Wno-c++11-narrowing>
     $<$<COMPILE_LANGUAGE:CXX>:-fpermissive>)
 target_link_libraries(bluemsx-core PUBLIC m)
 
