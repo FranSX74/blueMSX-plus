@@ -163,8 +163,33 @@
 
 
 #include "romExclusion.h"
+#include "SysRomLocator.h"
 
 static char machinesDir[PROP_MAXPATH]  = "";
+
+/* The machines directory holding `machineName`: the primary one, or else the
+** first extra root (SysRomLocator) that has it. Extra roots are only set up on
+** platforms that split a writable and a shared machines tree. */
+static const char* machineRootFor(const char* machineName)
+{
+    char path[PROP_MAXPATH + 64];
+    FILE* file;
+    int i;
+
+    for (i = -1; i < sysRomMachineDirCount(); i++) {
+        const char* root = i < 0 ? machinesDir : sysRomMachineDir(i);
+        sprintf(path, "%s/%s/config.ini", root, machineName);
+        if ((file = fopen(path, "rb")) == NULL) {
+            sprintf(path, "%s/%s.zip", root, machineName);
+            file = fopen(path, "rb");
+        }
+        if (file != NULL) {
+            fclose(file);
+            return root;
+        }
+    }
+    return machinesDir;
+}
 
 int toint(char* buffer) 
 {
@@ -434,7 +459,8 @@ static int readMachine(Machine* machine, const char* machineName, const char* fi
                 strcasestr(machine->slotInfo[i].name, "Machines\\") == machine->slotInfo[i].name)
             {
                 char expandedPath[1024];
-                sprintf(expandedPath, "%s/%s", machinesDir, machine->slotInfo[i].name + 9);
+                sysRomResolve(machinesDir, machine->slotInfo[i].name + 9,
+                              expandedPath, sizeof(expandedPath));
                 strcpy(machine->slotInfo[i].name, expandedPath);
             }
         }
@@ -582,6 +608,7 @@ void machineSave(Machine* machine)
 
 Machine* machineCreate(const char* machineName)
 {
+    const char* root;
     char configIni[512];
     Machine* machine;
     int success;
@@ -593,8 +620,9 @@ Machine* machineCreate(const char* machineName)
     
     machine->zipFile = NULL;
     machine->isZipped = 0;
-    
-    sprintf(configIni, "%s/%s/config.ini", machinesDir, machineName);
+
+    root = machineRootFor(machineName);
+    sprintf(configIni, "%s/%s/config.ini", root, machineName);
     file = fopen(configIni, "rb");
     
     if (file != NULL)
@@ -606,7 +634,7 @@ Machine* machineCreate(const char* machineName)
         // No config.ini. Is it compressed?
         char zipFile[512];
         
-        sprintf(zipFile, "%s/%s.zip", machinesDir, machineName);
+        sprintf(zipFile, "%s/%s.zip", root, machineName);
         file = fopen(zipFile, "rb");
         
         if (file == NULL)
@@ -713,6 +741,17 @@ int machineIsValid(const char* machineName, int checkRoms)
     return success;
 }
 
+static int machineListContains(ArrayList* list, const char* name)
+{
+    int i;
+    for (i = 0; i < arrayListGetSize(list); i++) {
+        if (strcmp((const char*)arrayListGetObject(list, i), name) == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 void machineFillAvailable(ArrayList *list, int checkRoms)
 {
     const char* machineName = appConfigGetString("singlemachine", NULL);
@@ -737,15 +776,18 @@ void machineFillAvailable(ArrayList *list, int checkRoms)
         }
     }
     else {
+      int root;
+      for (root = -1; root < sysRomMachineDirCount(); root++) {
+        const char* rootDir = root < 0 ? machinesDir : sysRomMachineDir(root);
         char globPath[PROP_MAXPATH];
         ArchGlob* glob;
         int i;
         
-        sprintf(globPath, "%s/*", machinesDir);
+        sprintf(globPath, "%s/*", rootDir);
         
         glob = archGlob(globPath, ARCH_GLOB_DIRS);
         if (glob == NULL)
-            return;
+            continue;
         
         for (i = 0; i < glob->count; i++) {
             char fileName[512];
@@ -761,7 +803,8 @@ void machineFillAvailable(ArrayList *list, int checkRoms)
                     machineName = glob->pathVector[i] - 1;
                 }
                 machineName++;
-                if (machineIsValid(machineName, checkRoms)) {
+                if (!machineListContains(list, machineName) &&
+                    machineIsValid(machineName, checkRoms)) {
                     char *name = (char *)calloc(512, sizeof(char));
                     strncpy(name, machineName, maxNameLength - 1);
                     arrayListAppend(list, name, 1);
@@ -775,12 +818,12 @@ void machineFillAvailable(ArrayList *list, int checkRoms)
         
         // Check ZIP sets
         
-        sprintf(globPath, "%s/*.zip", machinesDir);
+        sprintf(globPath, "%s/*.zip", rootDir);
         
         glob = archGlob(globPath, ARCH_GLOB_FILES);
         
         if (glob == NULL)
-            return;
+            continue;
         
         for (i = 0; i < glob->count; i++) {
             char buffer[512];
@@ -803,7 +846,8 @@ void machineFillAvailable(ArrayList *list, int checkRoms)
             
             machineName++;
             
-            if (machineIsValid(machineName, checkRoms))
+            if (!machineListContains(list, machineName) &&
+                machineIsValid(machineName, checkRoms))
             {
                 char *name = (char *)calloc(512, sizeof(char));
                 strncpy(name, machineName, maxNameLength - 1);
@@ -812,6 +856,7 @@ void machineFillAvailable(ArrayList *list, int checkRoms)
         }
         
         archGlobFree(glob);
+      }
     }
 }
 
@@ -1923,12 +1968,12 @@ MachineLoadReason machineDiagnose(const char* machineName)
     }
 
     /* config.ini path first, then .zip fallback -- same order as machineCreate. */
-    sprintf(path, "%s/%s/config.ini", machinesDir, machineName);
+    sprintf(path, "%s/%s/config.ini", machineRootFor(machineName), machineName);
     file = fopen(path, "rb");
     if (file != NULL) {
         fclose(file);
     } else {
-        sprintf(path, "%s/%s.zip", machinesDir, machineName);
+        sprintf(path, "%s/%s.zip", machineRootFor(machineName), machineName);
         file = fopen(path, "rb");
         if (file == NULL) {
             /* If Machines/ has no valid configs, the ini's machineName is a

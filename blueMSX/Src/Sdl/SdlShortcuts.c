@@ -97,8 +97,8 @@ static int stringToHotkey(const char* name)
 {
     int i;
 
-    for (i = 0; i < SDL_NUM_SCANCODES; i++) {
-        const char* sdlName = SDL_GetScancodeName(i);
+    for (i = 0; i < SDLK_LAST; i++) {
+        char* sdlName = SDL_GetKeyName(i);
         if (0 == strcmpnocase(name, sdlName)) {
             return i;
         }
@@ -277,7 +277,7 @@ void shortcutCheckUp(Shortcuts* s, int type, int mods, int keySym)
     if (HOTKEY_EQ(key, s->volumeDecrease))               actionVolumeDecrease();
     if (HOTKEY_EQ(key, s->volumeMute))                   actionMuteToggleMaster();
     if (HOTKEY_EQ(key, s->volumeStereo))                 actionVolumeToggleStereo();
-    if (HOTKEY_EQ(key, s->windowSizeNormal))             actionWindowSize1x();
+    if (HOTKEY_EQ(key, s->windowSizeNormal))             actionWindowSizeNormal();
     if (HOTKEY_EQ(key, s->windowSizeFullscreen))         actionWindowSizeFullscreen();
     if (HOTKEY_EQ(key, s->windowSizeFullscreenToggle))   actionFullscreenToggle();
 }

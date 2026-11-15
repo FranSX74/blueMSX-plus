@@ -16,3 +16,4 @@ x64/
 .claude/
 CLAUDE.md
 tmp/
+/build/

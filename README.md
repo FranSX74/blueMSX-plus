@@ -147,6 +147,22 @@ When multiple backends are enabled, **emulation runs in all enabled backends sim
 
 - Open the matching solution file (`Make/msvc2022/blueMSX.sln` or `Make/msvc2026/blueMSX.sln`) in **Visual Studio 2022** or **Visual Studio 2026** and build.
 
+### Linux (work in progress)
+
+Needs CMake, Ninja, a C/C++20 compiler and SDL3.
+
+```
+cmake -B build -G Ninja
+cmake --build build
+./build/bin/bluemsx-plus-sdl /machine "MSX2+ - C-BIOS" /rom1 game.rom
+```
+
+`bluemsx-plus-sdl` is a minimal frontend without menus (F6 cartridge, F7 disk, F8 cassette, F9 reset, F10 pause, F11 fullscreen, F12 quit; media files can be dropped on the window). Dear ImGui and Qt6 frontends are planned.
+
+- Settings and user data: `~/.config/bluemsx` (or `$XDG_CONFIG_HOME/bluemsx`). An existing `~/.blueMSX` is used when it is the only one, and is always searched for machines and ROMs. `$BLUEMSX_CONFIG_DIR` overrides both.
+- System ROMs are looked up in `Machines/<machine>/` below those folders, in their `systemroms/` folder, and in openMSX's `~/.openMSX/share/systemroms` (or `$OPENMSX_USER_DATA/systemroms`). ROMs there are recognised by SHA1 whatever their file name, through `Databases/sysromsha1.txt` (generated from the openMSX machine descriptions by `scripts/gen-sysrom-sha1.py`).
+- `BLUEMSX_DEBUG_ROMS=1` prints where every system ROM was taken from.
+
 
 ## Ideas for future releases
 

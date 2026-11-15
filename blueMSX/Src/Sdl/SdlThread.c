@@ -40,7 +40,7 @@ static int threadEntry(void* data)
 
 
 void* archThreadCreate(void (*entryPoint)(), int priority) { 
-    SDL_Thread* sdlThread = SDL_CreateThread(threadEntry, "emu", entryPoint);
+    SDL_Thread* sdlThread = SDL_CreateThread(threadEntry, entryPoint);
     return sdlThread;
 }
 
@@ -55,8 +55,7 @@ void  archThreadDestroy(void* thread)
 {
     SDL_Thread* sdlThread = (SDL_Thread*)thread;
 
-    /* SDL2 cannot kill threads; the emulator thread exits on its own */
-    SDL_DetachThread(sdlThread);
+    SDL_KillThread(sdlThread);
 }
 
 void archThreadSleep(int milliseconds) 

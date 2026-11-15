@@ -179,7 +179,7 @@ void sdlMouseSetFocus(int focus)
             SDL_ShowCursor(SDL_DISABLE);
         }
         if (mouse.mode == AM_ENABLE_MOUSE) {
-            SDL_WarpMouseInWindow(NULL, mouse.defX, mouse.defY);
+            SDL_WarpMouse(mouse.defX, mouse.defY);
         }
     }
     else {
@@ -255,10 +255,10 @@ void sdlMouseMove(int x, int y)
                 if (mouse.lockDy < -500) my = mouse.captRgn.top;
                 if (mouse.lockDy >  500) my = mouse.captRgn.bottom;
 
-                SDL_WarpMouseInWindow(NULL, mx, my);
+                SDL_WarpMouse(mx, my);
             }
             else if (sdlMouseInRect(x, y)) {
-                SDL_WarpMouseInWindow(NULL, mouse.defX, mouse.defY);
+                SDL_WarpMouse(mouse.defX, mouse.defY);
             }
         }
     }

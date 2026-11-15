@@ -973,6 +973,7 @@
     <ClCompile Include="..\..\Src\Utils\PacketFileSystem.c" />
     <ClCompile Include="..\..\Src\Utils\SaveState.c" />
     <ClCompile Include="..\..\Src\Utils\StrcmpNoCase.c" />
+    <ClCompile Include="..\..\Src\Utils\SysRomLocator.c" />
     <ClCompile Include="..\..\Src\Utils\TokenExtract.c" />
     <ClCompile Include="..\..\Src\Utils\VeryTinyXpath.cpp" />
     <ClCompile Include="..\..\Src\Utils\ziphelper.c" />
@@ -1344,6 +1345,7 @@
     <ClInclude Include="..\..\Src\Utils\PacketFileSystem.h" />
     <ClInclude Include="..\..\Src\Utils\SaveState.h" />
     <ClInclude Include="..\..\Src\Utils\StrcmpNoCase.h" />
+    <ClInclude Include="..\..\Src\Utils\SysRomLocator.h" />
     <ClInclude Include="..\..\Src\Utils\TokenExtract.h" />
     <ClInclude Include="..\..\Src\Utils\Utf8Conv.h" />
     <ClInclude Include="..\..\Src\Utils\VeryTinyXpath.h" />

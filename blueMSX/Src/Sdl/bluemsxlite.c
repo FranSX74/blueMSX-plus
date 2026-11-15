@@ -25,7 +25,9 @@
 **
 ******************************************************************************
 */
-/* SDL2 port: rendering through SDL_Renderer, no legacy OpenGL path */
+#ifndef __APPLE__
+#define ENABLE_OPENGL
+#endif
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -95,38 +97,78 @@ static GLuint textureId;
 #define EVENT_UPDATE_DISPLAY 2
 #define EVENT_UPDATE_WINDOW  3
 
-static SDL_Window*   sdlWindow   = NULL;
-static SDL_Renderer* sdlRenderer = NULL;
-static SDL_Texture*  sdlTexture  = NULL;
-static int texWidth = 0, texHeight = 0;
-
 void createSdlSurface(int width, int height, int fullscreen)
 {
-    bitDepth = 32;
-    if (sdlWindow == NULL) {
-        sdlWindow = SDL_CreateWindow("blueMSX+ (Linux/SDL2)", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-                                     width, height, SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
-        if (sdlWindow == NULL) return;
-        sdlRenderer = SDL_CreateRenderer(sdlWindow, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-        if (sdlRenderer == NULL) sdlRenderer = SDL_CreateRenderer(sdlWindow, -1, 0);
-    }
-    else {
-        SDL_SetWindowSize(sdlWindow, width, height);
-    }
-    SDL_SetWindowFullscreen(sdlWindow, fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
-    SDL_RenderSetLogicalSize(sdlRenderer, width, height);
+    int flags = SDL_SWSURFACE | (fullscreen ? SDL_FULLSCREEN : 0);
+    int bytepp;
 
-    if (sdlTexture == NULL || texWidth != width || texHeight != height) {
-        if (sdlTexture) SDL_DestroyTexture(sdlTexture);
-        sdlTexture = SDL_CreateTexture(sdlRenderer, SDL_PIXELFORMAT_XRGB8888, SDL_TEXTUREACCESS_STREAMING, width, height);
-        texWidth = width; texHeight = height;
-        free(displayData[0]);
-        displayPitch = width * 4;
-        displayData[0] = (char*)calloc(1, displayPitch * height);
+	// try default bpp
+	surface = SDL_SetVideoMode(width, height, 0, flags);
+	bytepp = (surface ? surface->format->BytesPerPixel : 0);
+	if (bytepp != 2 && bytepp != 4) {
+		surface = NULL;
+	}
+
+    if (!surface) { bitDepth = 32; surface = SDL_SetVideoMode(width, height, bitDepth, flags); }
+    if (!surface) { bitDepth = 16; surface = SDL_SetVideoMode(width, height, bitDepth, flags); }
+
+    if (surface != NULL) {
+        displayData[0] = (char*)surface->pixels;
         curDisplayData = 0;
+        displayPitch = surface->pitch;
     }
-    surface = (SDL_Surface*)sdlTexture; /* non-NULL marker for the legacy code paths */
 }
+
+static int roundUpPow2(int val) {
+    int rv = 1;
+    while (rv < val) rv *= 2;
+    return rv;
+}
+
+#ifdef ENABLE_OPENGL
+void createSdlGlSurface(int width, int height, int fullscreen)
+{
+    unsigned texW = roundUpPow2(width);
+	unsigned texH = roundUpPow2(height);
+
+    int flags = SDL_OPENGL | (fullscreen ? SDL_FULLSCREEN : 0);
+
+	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+
+	surface = SDL_SetVideoMode(width, height, fullscreen ? bitDepth : 0, flags);
+
+    if (surface != NULL) {
+        bitDepth = surface->format->BytesPerPixel * 8;
+    }
+
+	glViewport(0, 0, width, height);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glOrtho(0, width, height, 0, -1, 1);
+	glMatrixMode(GL_MODELVIEW);
+
+	displayData[0]  = (char*)calloc(1, bitDepth / 8 * texW * texH);
+	displayData[1]  = (char*)calloc(1, bitDepth / 8 * texW * texH);
+	displayPitch = width * bitDepth / 8;
+
+	texCoordX = (GLfloat)width  / texW;
+	texCoordY = (GLfloat)height / texH;
+
+	glGenTextures(1, &textureId);
+	glBindTexture(GL_TEXTURE_2D, textureId);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	if (bitDepth == 16) {
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, texW, texH, 0,
+			            GL_RGB, GL_UNSIGNED_SHORT_5_6_5, displayData[0]);
+	} 
+    else {
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texW, texH, 0,
+			            GL_RGBA, GL_UNSIGNED_BYTE, displayData[0]);
+	}
+}
+#endif
 
 int createSdlWindow()
 {
@@ -168,6 +210,8 @@ int createSdlWindow()
         createSdlSurface(width, height, fullscreen);
     }
 
+    // Set the window caption
+    SDL_WM_SetCaption( title, NULL );
 
     // Update mouse capture region
     sdlMouseSetCaptureRect(0, 0, width, height);
@@ -281,15 +325,24 @@ int updateEmuDisplay(int updateAll)
     }
 #endif
 
-    /* blueMSX+ videoRender takes the unzoomed border in bytes and clears it itself */
-    videoRender(video, frameBuffer, bitDepth, zoom, dpyData,
-                borderWidth > 0 ? borderWidth / zoom * bytesPerPixel : 0, displayPitch, -1);
+    videoRender(video, frameBuffer, bitDepth, zoom, 
+                dpyData + borderWidth * bytesPerPixel, 0, displayPitch, -1);
+
+    if (borderWidth > 0) {
+        int h = height;
+        while (h--) {
+            memset(dpyData, 0, borderWidth * bytesPerPixel);
+            memset(dpyData + (width - borderWidth) * bytesPerPixel, 0, borderWidth * bytesPerPixel);
+            dpyData += displayPitch;
+        }
+    }
 
 
-    SDL_UpdateTexture(sdlTexture, NULL, displayData[curDisplayData], displayPitch);
-    SDL_RenderClear(sdlRenderer);
-    SDL_RenderCopy(sdlRenderer, sdlTexture, NULL, NULL);
-    SDL_RenderPresent(sdlRenderer);
+    if (SDL_MUSTLOCK(surface) && SDL_LockSurface(surface) < 0) {
+        return 0;
+    }
+    SDL_UpdateRect(surface, 0, 0, width, height);
+    if (SDL_MUSTLOCK(surface)) SDL_UnlockSurface(surface);
 
     return 0; 
 }
@@ -374,16 +427,13 @@ void setDefaultPaths(const char* rootDir)
 
     propertiesSetDirectory(rootDir, rootDir);
 
-    sprintf(buffer, "%s/Machines", rootDir);
-    machineSetDirectory(buffer);
-
     sprintf(buffer, "%s/Audio Capture", rootDir);
     archCreateDirectory(buffer);
     actionSetAudioCaptureSetDirectory(buffer, "");
 
     sprintf(buffer, "%s/Video Capture", rootDir);
     archCreateDirectory(buffer);
-    actionSetVideoCaptureSetDirectory(buffer, "");
+    actionSetAudioCaptureSetDirectory(buffer, "");
 
     sprintf(buffer, "%s/QuickSave", rootDir);
     archCreateDirectory(buffer);
@@ -427,20 +477,22 @@ static void handleEvent(SDL_Event* event)
             break;
         }
         break;
-    case SDL_WINDOWEVENT:
-        switch (event->window.event) {
-        case SDL_WINDOWEVENT_FOCUS_GAINED: keyboardSetFocus(1, 1); break;
-        case SDL_WINDOWEVENT_FOCUS_LOST:   keyboardSetFocus(1, 0); break;
-        case SDL_WINDOWEVENT_ENTER:        sdlMouseSetFocus(1); break;
-        case SDL_WINDOWEVENT_LEAVE:        sdlMouseSetFocus(0); break;
-        case SDL_WINDOWEVENT_EXPOSED:      updateEmuDisplay(1); break;
+    case SDL_ACTIVEEVENT:
+        if (event->active.state & SDL_APPINPUTFOCUS) {
+            keyboardSetFocus(1, event->active.gain);
+        }
+        if (event->active.state == SDL_APPMOUSEFOCUS) {
+            sdlMouseSetFocus(event->active.gain);
         }
         break;
     case SDL_KEYDOWN:
-        shortcutCheckDown(shortcuts, HOTKEY_TYPE_KEYBOARD, keyboardGetModifiers(), event->key.keysym.scancode);
+        shortcutCheckDown(shortcuts, HOTKEY_TYPE_KEYBOARD, keyboardGetModifiers(), event->key.keysym.sym);
         break;
     case SDL_KEYUP:
-        shortcutCheckUp(shortcuts, HOTKEY_TYPE_KEYBOARD, keyboardGetModifiers(), event->key.keysym.scancode);
+        shortcutCheckUp(shortcuts, HOTKEY_TYPE_KEYBOARD, keyboardGetModifiers(), event->key.keysym.sym);
+        break;
+    case SDL_VIDEOEXPOSE:
+        updateEmuDisplay(1);
         break;
     case SDL_MOUSEBUTTONDOWN:
     case SDL_MOUSEBUTTONUP:
@@ -570,7 +622,7 @@ int main(int argc, char **argv)
 
     i = emuTryStartWithArguments(properties, szLine, NULL);
     if (i < 0) {
-        printf("Failed to parse command line: %s\n", emuCommandLineGetError());
+        printf("Failed to parse command line\n");
         return 0;
     }
     
@@ -591,10 +643,8 @@ int main(int argc, char **argv)
         } while(SDL_PollEvent(&event));
     }
 
-	// Stop the emulation thread before tearing down what it uses.
-	emulatorStop();
-	emulatorExit();
-
+	// For stop threads before destroy.
+	// Clean up.
 	if (SDL_WasInit(SDL_INIT_EVERYTHING)) {
 		SDL_Quit(); 
 	}

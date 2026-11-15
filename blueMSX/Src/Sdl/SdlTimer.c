@@ -54,12 +54,11 @@ UInt32 archGetHiresTimer() {
 
 #else 
 
-static int (*timerCb)(void*) = NULL;
+static void (*timerCb)(void*) = NULL;
 static UInt32 timerFreq;
 static UInt32 lastTimeout;
-static SDL_TimerID timerId = 0;
 
-static Uint32 timerCalback(Uint32 interval, void* param)
+Uint32 timerCalback(Uint32 interval)
 {
     if (timerCb) {
         UInt32 currentTime = archGetSystemUpTime(timerFreq);
@@ -78,7 +77,7 @@ void* archCreateTimer(int period, int (*timerCallback)(void*))
     lastTimeout = archGetSystemUpTime(timerFreq);
     timerCb  = timerCallback;
 
-    timerId = SDL_AddTimer(period, timerCalback, NULL);
+    SDL_SetTimer(period, timerCalback);
 
     return timerCallback;
 }
@@ -89,8 +88,7 @@ void archTimerDestroy(void* timer)
         return;
     }
 
-    if (timerId) SDL_RemoveTimer(timerId);
-    timerId = 0;
+    SDL_SetTimer(0, NULL);
     timerCb = NULL;
 }
 
