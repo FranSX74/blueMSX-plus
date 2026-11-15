@@ -395,6 +395,7 @@ static void hookMenuUpdate(int)
             theWindow->rebuildMenuBar();
             theWindow->updateTitle();
         }
+        refreshDialogs();
     });
 }
 

@@ -149,6 +149,13 @@ int  chooseFile(const FrontendFileRequest* req, char* out, int outSize);
 int  chooseFromList(FrontendListRequest* req);
 void showMessage(FrontendMessageKind kind, const QString& text);
 void openDialog(FrontendDialog dialog, int arg);
+/* Brings open dialogs in step with the properties (after menus, shortcuts). */
+void refreshDialogs();
+
+/* QtProperties.cpp, QtShortcuts.cpp */
+void openProperties(int page);
+void refreshProperties();
+void openShortcutEditor();
 
 /* ---- Scripted checks (QtTest.cpp) --------------------------------------------- */
 

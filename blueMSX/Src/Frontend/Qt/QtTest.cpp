@@ -6,6 +6,7 @@
 **   menu A/B/C     trigger a menu item by its path of (translated) titles;
 **                  the shortcut text after a tab is ignored
 **   popup MENU     open a core popup menu (FrontendMenu number)
+**   dialog N [ARG] open a dialog (FrontendDialog number, PropPage for 0)
 **   key NAME       press and release an MSX key (SDL scancode name)
 **   qkey NAME      press and release a key in the focused Qt widget
 **                  (Return, Escape, Tab, Up, Down, Left, Right, Space)
@@ -25,6 +26,7 @@
 
 #include <QAction>
 #include <QApplication>
+#include <QDialog>
 #include <QElapsedTimer>
 #include <QKeyEvent>
 #include <QMenu>
@@ -85,8 +87,15 @@ static void triggerMenuPath(const QString& path)
 
 static QWidget* activeWindow()
 {
+    /* Wayland may not report a modeless dialog as active: take the newest
+    ** visible top-level dialog. */
+    QWidget* dialog = NULL;
+    for (QWidget* w : QApplication::topLevelWidgets()) {
+        if (w->isVisible() && w->isWindow() && w != mainWindow() && qobject_cast<QDialog*>(w)) dialog = w;
+    }
     if (QWidget* w = QApplication::activePopupWidget()) return w;
     if (QWidget* w = QApplication::activeModalWidget()) return w;
+    if (dialog) return dialog;
     if (QWidget* w = QApplication::activeWindow()) return w;
     return mainWindow();
 }
@@ -106,6 +115,9 @@ static void run(const Step& st)
     }
     else if (st.cmd == "popup") {
         mainWindow()->popupMenu((FrontendMenu)st.arg.toInt());
+    }
+    else if (st.cmd == "dialog") {
+        openDialog((FrontendDialog)st.arg.section(' ', 0, 0).toInt(), st.arg.section(' ', 1, 1).toInt());
     }
     else if (st.cmd == "key") {
         SDL_Scancode sc = SDL_GetScancodeFromName(st.arg.toUtf8().constData());

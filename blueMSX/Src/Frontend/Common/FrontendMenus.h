@@ -59,6 +59,9 @@ void buildMenu(FrontendMenu menu, MenuBuilder& b);
 /* "Machine name", with a pause or stop mark, for a status line. */
 std::string machineStatus();
 
+/* The description of a ShortcutId, in the current language. */
+const char* shortcutDescription(int shortcut);
+
 /* File name without its directory. */
 const char* baseName(const char* path);
 
