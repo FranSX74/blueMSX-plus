@@ -44,6 +44,7 @@
 #include "AppConfig.h"
 #include "ArchFile.h"
 #include "SaveState.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
@@ -288,8 +289,34 @@ int emuNormalizeOneArg(const char* cmdLine, char* out, int outSize) {
     return 1;
 }
 
+/* An argument is an option when it starts with '-', or with '/' as on
+** Windows. Outside Windows an absolute path starts with '/' too, so there a
+** '/' argument is an option only when it has no other '/' and names no
+** existing file: /rom1 is an option, /home/me/game.rom is a file. */
+static int isOptionArg(const char* arg) {
+    if (arg[0] == '-') {
+        return 1;
+    }
+    if (arg[0] != '/') {
+        return 0;
+    }
+#ifndef _WIN32
+    if (strchr(arg + 1, '/') != NULL) {
+        return 0;
+    }
+    {
+        FILE* f = fopen(arg, "rb");
+        if (f != NULL) {
+            fclose(f);
+            return 0;
+        }
+    }
+#endif
+    return 1;
+}
+
 int emuArgMatches(const char* arg, const char* value) {
-    if (arg[0] != '/' && arg[0] != '-') {
+    if (!isOptionArg(arg)) {
         return 0;
     }
 
@@ -955,7 +982,8 @@ static int emuStartWithArguments(Properties* properties, char* commandLine, char
 
     /* The path is quoted so a name with spaces stays one token. A drive letter
     ** is not the test: a UNC or relative path has none. */
-    if (commandLine[0] != 0 && commandLine[0] != '/' && commandLine[0] != '-' &&
+    if (commandLine[0] != 0 && extractToken(commandLine, 0) != NULL &&
+        !isOptionArg(extractToken(commandLine, 0)) &&
         commandLine[0] != '\"' && !lineHasOption(commandLine)) {
         int len;
         cmdLine[0] = '\"';
@@ -978,7 +1006,7 @@ static int emuStartWithArguments(Properties* properties, char* commandLine, char
 
         /* The dash forms are options too, so a line that is only -mute is not
         ** a file. */
-        if (argument && *argument != '/' && *argument != '-') {
+        if (argument && !isOptionArg(argument)) {
             return launchBareFile(properties, argument);
         }
     }
@@ -991,7 +1019,7 @@ static int emuStartWithArguments(Properties* properties, char* commandLine, char
         RomType builtin = ROM_UNKNOWN;
         char option[64];
 
-        if (argument[0] != '/' && argument[0] != '-') {
+        if (!isOptionArg(argument)) {
             if (bareFile[0]) {
                 return argError(NULL, "More than one file to open:", argument);
             }

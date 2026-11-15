@@ -14,6 +14,8 @@
 #include "Actions.h"
 #include "ArchEvent.h"
 #include "ArchFile.h"
+#include "ArchGlob.h"
+#include "ArchMenu.h"
 #include "ArchNotifications.h"
 #include "ArchSound.h"
 #include "AudioMixer.h"
@@ -34,6 +36,7 @@
 #include "SysRomLocator.h"
 #include "UartIO.h"
 #include "VideoRender.h"
+#include "Switches.h"
 
 #include <SDL3/SDL.h>
 #include <stdio.h>
@@ -73,6 +76,41 @@ static char* userDir(char* out, const char* name)
     platformPathJoin(out, PLATFORM_PATH_MAX, platformPaths()->configDir, name);
     platformMakeDirs(out);
     return out;
+}
+
+/* Shipped defaults are named "*.default" so that a new release never
+** overwrites edited copies: each one is copied once, without the suffix. */
+static void seedTemplates(const char* srcDir, const char* dstDir)
+{
+    char pattern[PLATFORM_PATH_MAX];
+    ArchGlob* glob;
+    int i;
+
+    platformPathJoin(pattern, sizeof(pattern), srcDir, "*.default");
+    glob = archGlob(pattern, ARCH_GLOB_FILES);
+    if (glob == NULL) return;
+    for (i = 0; i < glob->count; i++) {
+        const char* base = strrchr(glob->pathVector[i], '/');
+        char dst[PLATFORM_PATH_MAX];
+        FILE* in;
+        FILE* out;
+        size_t len;
+
+        base = base ? base + 1 : glob->pathVector[i];
+        len = strlen(base) - strlen(".default");
+        snprintf(dst, sizeof(dst), "%s/%.*s", dstDir, (int)len, base);
+        if (len == 0 || platformIsFile(dst)) continue;
+        in = fopen(glob->pathVector[i], "rb");
+        out = in ? fopen(dst, "wb") : NULL;
+        if (in && out) {
+            char buf[4096];
+            size_t n;
+            while ((n = fread(buf, 1, sizeof(buf), in)) > 0) fwrite(buf, 1, n, out);
+        }
+        if (out) fclose(out);
+        if (in) fclose(in);
+    }
+    archGlobFree(glob);
 }
 
 static void setupDirectories(void)
@@ -123,6 +161,10 @@ static void setupDirectories(void)
     boardSetDirectory(userDir(dir, "SRAM"));
     tapeSetDirectory(userDir(dir, "Casinfo"), "");
     shortcutsSetDirectory(userDir(dir, "Shortcut Profiles"));
+    if (p->dataDir[0]) {
+        char src[PLATFORM_PATH_MAX];
+        seedTemplates(platformPathJoin(src, sizeof(src), p->dataDir, "Shortcut Profiles"), dir);
+    }
 }
 
 /* ---- Start and stop ------------------------------------------------------- */
@@ -216,7 +258,7 @@ int platformInit(int argc, char** argv, const FrontendHooks* frontendHooks)
     mixerEnableMaster(mixer, properties->sound.masterEnable);
 
     videoUpdateAll(video, properties);
-    platformShortcutsLoad();
+    platformShortcutsLoad(properties->emulation.shortcutProfile);
     mediaDbSetDefaultRomType(properties->cartridge.defaultType);
 
     for (i = 0; i < PROP_MAX_CARTS; i++) {
@@ -271,6 +313,102 @@ int platformInit(int argc, char** argv, const FrontendHooks* frontendHooks)
     return 0;
 }
 
+/* ---- Settings changed by a frontend dialog -------------------------------- */
+
+static int soundNeedsRestart(const Properties* a, const Properties* b)
+{
+    return a->sound.bufSize              != b->sound.bufSize
+        || a->sound.chip.enableY8950     != b->sound.chip.enableY8950
+        || a->sound.chip.enableYM2413    != b->sound.chip.enableYM2413
+        || a->sound.chip.enableMoonsound != b->sound.chip.enableMoonsound
+        || a->sound.stereo               != b->sound.stereo;
+}
+
+void platformSaveProperties(void)
+{
+    if (properties != NULL) propSave(properties);
+}
+
+void platformApplyProperties(const Properties* old)
+{
+    Properties* p = properties;
+    int i;
+
+    if (p == NULL || old == NULL) return;
+
+    /* An explicit change makes command line values permanent. */
+    emuCommandLineDropOverrides();
+
+    videoSetColors(video, p->video.saturation, p->video.brightness,
+                   p->video.contrast, p->video.gamma);
+    videoSetScanLines(video, p->video.scanlinesEnable, p->video.scanlinesPct);
+    videoSetColorSaturation(video, p->video.colorSaturationEnable,
+                            p->video.colorSaturationWidth);
+    videoUpdateAll(video, p);
+    mediaDbSetDefaultRomType(p->cartridge.defaultType);
+
+    if (p->ports.Lpt.type != old->ports.Lpt.type ||
+        strcmp(p->ports.Lpt.fileName, old->ports.Lpt.fileName) != 0) {
+        printerIoSetType(p->ports.Lpt.type, p->ports.Lpt.fileName);
+    }
+    if (p->ports.Com.type != old->ports.Com.type ||
+        strcmp(p->ports.Com.fileName, old->ports.Com.fileName) != 0) {
+        uartIoSetType(p->ports.Com.type, p->ports.Com.fileName);
+    }
+    if (p->sound.MidiOut.type != old->sound.MidiOut.type ||
+        strcmp(p->sound.MidiOut.fileName, old->sound.MidiOut.fileName) != 0) {
+        midiIoSetMidiOutType(p->sound.MidiOut.type, p->sound.MidiOut.fileName);
+    }
+    if (p->sound.MidiIn.type != old->sound.MidiIn.type ||
+        strcmp(p->sound.MidiIn.fileName, old->sound.MidiIn.fileName) != 0) {
+        midiIoSetMidiInType(p->sound.MidiIn.type, p->sound.MidiIn.fileName);
+    }
+
+    boardSetFdcTimingEnable(p->emulation.enableFdcTiming);
+    boardSetHddSdBoostEnable(p->emulation.enableHddSdBoost);
+    boardSetCasBoostEnable(p->emulation.enableCasBoost);
+    boardSetNoSpriteLimits(p->emulation.noSpriteLimits);
+    boardSetVdpCmdSpeed(p->emulation.vdpCmdSpeed);
+    boardSetVideoAutodetect(p->video.detectActiveMonitor);
+    switchSetAudio(p->emulation.audioSwitch);
+    switchSetFront(p->emulation.frontSwitch);
+    switchSetPause(p->emulation.pauseSwitch);
+    emulatorSetFrequency(p->emulation.speed, NULL);
+
+    if (soundNeedsRestart(old, p)) {
+        emulatorRestartSound();
+    }
+    if (old->sound.chip.enableY8950     != p->sound.chip.enableY8950 ||
+        old->sound.chip.enableYM2413    != p->sound.chip.enableYM2413 ||
+        old->sound.chip.enableMoonsound != p->sound.chip.enableMoonsound) {
+        boardSetY8950Enable(p->sound.chip.enableY8950);
+        boardSetYm2413Enable(p->sound.chip.enableYM2413);
+        boardSetMoonsoundEnable(p->sound.chip.enableMoonsound);
+    }
+
+    for (i = 0; i < MIXER_CHANNEL_TYPE_COUNT; i++) {
+        mixerSetChannelTypeVolume(mixer, i, p->sound.mixerChannel[i].volume);
+        mixerSetChannelTypePan(mixer, i, p->sound.mixerChannel[i].pan);
+        mixerEnableChannelType(mixer, i, p->sound.mixerChannel[i].enable);
+    }
+    mixerSetMasterVolume(mixer, p->sound.masterVolume);
+    mixerEnableMaster(mixer, p->sound.masterEnable);
+
+    if (p->language != old->language) {
+        langSetLanguage(p->language);
+    }
+    if (strcmp(p->emulation.shortcutProfile, old->emulation.shortcutProfile) != 0) {
+        platformShortcutsLoad(p->emulation.shortcutProfile);
+    }
+
+    if (p->video.windowSize != old->video.windowSize ||
+        p->video.horizontalStretch != old->video.horizontalStretch ||
+        p->video.verticalStretch != old->video.verticalStretch) {
+        archUpdateWindow();
+    }
+    archUpdateMenu(0);
+}
+
 void platformShutdown(void)
 {
     if (properties == NULL) {
@@ -284,6 +422,7 @@ void platformShutdown(void)
 
     propSave(properties);
     platformShortcutsFree();
+    platformInputShutdown();
     archSoundDestroy();
     videoDestroy(video);
     mixerDestroy(mixer);
@@ -297,6 +436,8 @@ void platformShutdown(void)
 
 /* ---- Display -------------------------------------------------------------- */
 
+static int lastMaxWidth = PLATFORM_SCREEN_WIDTH;
+
 int platformRenderFrame(void* dst, int pitch, int zoom)
 {
     FrameBuffer* frameBuffer;
@@ -308,9 +449,28 @@ int platformRenderFrame(void* dst, int pitch, int zoom)
     }
 
     /* videoRender takes the unzoomed border in bytes and clears it itself. */
+    lastMaxWidth = frameBuffer->maxWidth;
     borderWidth = (PLATFORM_SCREEN_WIDTH - frameBuffer->maxWidth) / 2;
     return videoRender(video, frameBuffer, 32, zoom, dst,
                        borderWidth > 0 ? borderWidth * 4 : 0, pitch, -1);
+}
+
+void platformScreenSourceRect(int zoom, int* x, int* y, int* w, int* h)
+{
+    int border = 0;
+    int crop = 0;
+
+    if (properties != NULL && properties->video.horizontalStretch &&
+        lastMaxWidth > 0 && lastMaxWidth < PLATFORM_SCREEN_WIDTH) {
+        border = (PLATFORM_SCREEN_WIDTH - lastMaxWidth) / 2;
+    }
+    if (properties != NULL && properties->video.verticalStretch) {
+        crop = 7;
+    }
+    *x = border * zoom;
+    *y = crop * zoom;
+    *w = (PLATFORM_SCREEN_WIDTH - 2 * border) * zoom;
+    *h = (PLATFORM_SCREEN_HEIGHT - 2 * crop) * zoom;
 }
 
 void platformDisplayDone(void)

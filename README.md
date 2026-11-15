@@ -154,14 +154,23 @@ Needs CMake, Ninja, a C/C++20 compiler and SDL3.
 ```
 cmake -B build -G Ninja
 cmake --build build
-./build/bin/bluemsx-plus-sdl /machine "MSX2+ - C-BIOS" /rom1 game.rom
+./build/bin/bluemsx-plus-imgui game.rom
+./build/bin/bluemsx-plus-imgui /machine "MSX2+ - C-BIOS" /rom1 game.rom
 ```
 
-`bluemsx-plus-sdl` is a minimal frontend without menus (F6 cartridge, F7 disk, F8 cassette, F9 reset, F10 pause, F11 fullscreen, F12 quit; media files can be dropped on the window). Dear ImGui and Qt6 frontends are planned.
+Two executables share the same emulator and settings:
+
+- `bluemsx-plus-imgui` (Dear ImGui): the blueMSX menus (File, Emulation, Window, Options, Tools, Help) with file history, special cartridges and zip contents; a built-in file browser (or the desktop's own through "System dialog..."); Properties, Shortcut editor, Audio mixer and Language windows. The menu bar hides itself in fullscreen.
+- `bluemsx-plus-sdl`: a bare window without menus, driven by the keyboard shortcuts alone.
+
+Both use the blueMSX shortcut profiles (`Shortcut Profiles/*.ini`, same format as on Windows, created from the shipped defaults on first run) and the first two gamepads as MSX joysticks 1 and 2 (d-pad or left stick, A/X button 1, B/Y button 2). Media files can be dropped on the window. A Qt6 frontend with the classic look is planned.
+
+On Linux an absolute path also starts with `/`: an argument is read as an option only when it has no other `/` and names no existing file, so `/rom1 /home/me/game.rom` works as expected.
 
 - Settings and user data: `~/.config/bluemsx` (or `$XDG_CONFIG_HOME/bluemsx`). An existing `~/.blueMSX` is used when it is the only one, and is always searched for machines and ROMs. `$BLUEMSX_CONFIG_DIR` overrides both.
 - System ROMs are looked up in `Machines/<machine>/` below those folders, in their `systemroms/` folder, and in openMSX's `~/.openMSX/share/systemroms` (or `$OPENMSX_USER_DATA/systemroms`). ROMs there are recognised by SHA1 whatever their file name, through `Databases/sysromsha1.txt` (generated from the openMSX machine descriptions by `scripts/gen-sysrom-sha1.py`).
 - `BLUEMSX_DEBUG_ROMS=1` prints where every system ROM was taken from.
+- `BLUEMSX_TEST="2 move 20 8; 2.2 click; 3 snap shot.bmp; 4 quit"` (ImGui frontend) plays a timed script of mouse moves (window points), clicks, `key NAME`, `text STR`, snapshots and quit, for automated UI checks.
 
 
 ## Ideas for future releases

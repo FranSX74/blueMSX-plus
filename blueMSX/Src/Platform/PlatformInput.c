@@ -23,6 +23,10 @@
 
 #include <SDL3/SDL_scancode.h>
 #include <SDL3/SDL_mutex.h>
+#include <SDL3/SDL_init.h>
+#include <SDL3/SDL_gamepad.h>
+#include <SDL3/SDL_events.h>
+#include <stdio.h>
 #include <string.h>
 
 #define KBD_TABLE_LEN 512
@@ -47,6 +51,8 @@ static int keyStatus[KBD_TABLE_NUM][KBD_TABLE_LEN];
 static volatile unsigned char keyDown[KBD_TABLE_LEN];   /* written by the UI thread */
 static volatile int hasFocus = 1;
 static int kbdModifiers;
+
+static void padInit(void);
 
 // initKbdTable initializes the keyboard table with default keys
 static void initKbdTable(void)
@@ -225,18 +231,20 @@ void platformInputInit(void)
     initKbdTable();
     inputEventReset();
     kbdModifiers = 0;
+    padInit();
 }
 
 void platformKeyEvent(int scancode, int pressed)
 {
-    int mods;
     if (scancode <= 0 || scancode >= KBD_TABLE_LEN) {
         return;
     }
+    /* A shortcut key does not reach the MSX. Modifiers always do, and are
+    ** tracked by the shortcut module too. */
+    if (platformShortcutKey(scancode, pressed) && !keyDown[scancode]) {
+        return;
+    }
     keyDown[scancode] = pressed ? 1 : 0;
-    mods = modifiersFrom(keyDown);
-    if (pressed) platformShortcutDown(mods, scancode);
-    else         platformShortcutUp(mods, scancode);
 }
 
 void platformKeyboardFocus(int focused)
@@ -244,6 +252,7 @@ void platformKeyboardFocus(int focused)
     hasFocus = focused;
     if (!focused) {
         memset((void*)keyDown, 0, sizeof(keyDown));
+        platformShortcutsReleaseAll();
     }
 }
 
@@ -251,18 +260,10 @@ void platformKeyboardFocus(int focused)
 void archPollInput(void)
 {
     int i;
-    int hostShortcut;
 
     kbdModifiers = modifiersFrom(keyDown);
-
-    /* Modifier + F6..F12 are host shortcuts: keep them from the MSX. */
-    hostShortcut = kbdModifiers &&
-        (keyDown[SDL_SCANCODE_F6] | keyDown[SDL_SCANCODE_F7] | keyDown[SDL_SCANCODE_F8] |
-         keyDown[SDL_SCANCODE_F9] | keyDown[SDL_SCANCODE_F10] | keyDown[SDL_SCANCODE_F11] |
-         keyDown[SDL_SCANCODE_F12]);
-
     for (i = 0; i < KBD_TABLE_LEN; i++) {
-        applyKey(i, hasFocus && !hostShortcut ? keyDown[i] : 0);
+        applyKey(i, hasFocus ? keyDown[i] : 0);
     }
 }
 
@@ -278,12 +279,147 @@ char* archKeyconfigSelectedKeyTitle(void) { return ""; }
 char* archKeyconfigMappedToTitle(void) { return ""; }
 char* archKeyconfigMappingSchemeTitle(void) { return ""; }
 
-/* ---- Joysticks (SDL gamepads come with the playable frontend step) ------- */
+/* ---- Gamepads ---------------------------------------------------------------
+** The first two gamepads drive MSX joysticks 1 and 2: d-pad or left stick for
+** the directions, A/X for trigger 1 and B/Y for trigger 2. They press the
+** joystick pseudo keys, so the keyboard tables can remap them like any key. */
+
+#define PAD_MAX        2
+#define STICK_DEADZONE 12000
+
+static struct {
+    SDL_JoystickID id;
+    SDL_Gamepad*   pad;
+    char           name[128];
+} pads[PAD_MAX];
+
+static void padRefresh(int n)
+{
+    SDL_Gamepad* g = pads[n].pad;
+    int base = n == 0 ? SDL_SCANCODE_JOY1_BUTTON1 : SDL_SCANCODE_JOY2_BUTTON1;
+    int ax = 0, ay = 0;
+    int up, down, left, right, b1, b2;
+
+    if (g != NULL) {
+        ax = SDL_GetGamepadAxis(g, SDL_GAMEPAD_AXIS_LEFTX);
+        ay = SDL_GetGamepadAxis(g, SDL_GAMEPAD_AXIS_LEFTY);
+    }
+    up    = g && (SDL_GetGamepadButton(g, SDL_GAMEPAD_BUTTON_DPAD_UP)    || ay < -STICK_DEADZONE);
+    down  = g && (SDL_GetGamepadButton(g, SDL_GAMEPAD_BUTTON_DPAD_DOWN)  || ay >  STICK_DEADZONE);
+    left  = g && (SDL_GetGamepadButton(g, SDL_GAMEPAD_BUTTON_DPAD_LEFT)  || ax < -STICK_DEADZONE);
+    right = g && (SDL_GetGamepadButton(g, SDL_GAMEPAD_BUTTON_DPAD_RIGHT) || ax >  STICK_DEADZONE);
+    b1    = g && (SDL_GetGamepadButton(g, SDL_GAMEPAD_BUTTON_SOUTH) || SDL_GetGamepadButton(g, SDL_GAMEPAD_BUTTON_WEST));
+    b2    = g && (SDL_GetGamepadButton(g, SDL_GAMEPAD_BUTTON_EAST)  || SDL_GetGamepadButton(g, SDL_GAMEPAD_BUTTON_NORTH));
+
+    /* base is BUTTON1; BUTTON2, UP, DOWN, LEFT, RIGHT follow. */
+    keyDown[base + 0] = b1;
+    keyDown[base + 1] = b2;
+    keyDown[base + 2] = up;
+    keyDown[base + 3] = down;
+    keyDown[base + 4] = left;
+    keyDown[base + 5] = right;
+}
+
+static int padIndex(SDL_JoystickID id)
+{
+    int n;
+    for (n = 0; n < PAD_MAX; n++) {
+        if (pads[n].pad != NULL && pads[n].id == id) return n;
+    }
+    return -1;
+}
+
+static void padOpen(SDL_JoystickID id)
+{
+    int n;
+    if (padIndex(id) >= 0) return;
+    for (n = 0; n < PAD_MAX; n++) {
+        if (pads[n].pad == NULL) {
+            const char* name;
+            pads[n].pad = SDL_OpenGamepad(id);
+            if (pads[n].pad == NULL) return;
+            pads[n].id = id;
+            name = SDL_GetGamepadName(pads[n].pad);
+            snprintf(pads[n].name, sizeof(pads[n].name), "%s", name ? name : "Gamepad");
+            padRefresh(n);
+            return;
+        }
+    }
+}
+
+static void padClose(SDL_JoystickID id)
+{
+    int n = padIndex(id);
+    if (n < 0) return;
+    SDL_CloseGamepad(pads[n].pad);
+    pads[n].pad = NULL;
+    pads[n].name[0] = 0;
+    padRefresh(n);
+}
+
+void platformHandleSdlEvent(const SDL_Event* ev)
+{
+    int n;
+    switch (ev->type) {
+    case SDL_EVENT_GAMEPAD_ADDED:
+        padOpen(ev->gdevice.which);
+        break;
+    case SDL_EVENT_GAMEPAD_REMOVED:
+        padClose(ev->gdevice.which);
+        break;
+    case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
+    case SDL_EVENT_GAMEPAD_BUTTON_UP:
+        if ((n = padIndex(ev->gbutton.which)) >= 0) padRefresh(n);
+        break;
+    case SDL_EVENT_GAMEPAD_AXIS_MOTION:
+        if ((n = padIndex(ev->gaxis.which)) >= 0) padRefresh(n);
+        break;
+    default:
+        break;
+    }
+}
+
+static void padInit(void)
+{
+    SDL_JoystickID* ids;
+    int count = 0;
+    int i;
+
+    memset(pads, 0, sizeof(pads));
+    if (!SDL_InitSubSystem(SDL_INIT_GAMEPAD)) return;
+    ids = SDL_GetGamepads(&count);
+    for (i = 0; ids != NULL && i < count; i++) padOpen(ids[i]);
+    SDL_free(ids);
+}
+
+void platformInputShutdown(void)
+{
+    int n;
+    for (n = 0; n < PAD_MAX; n++) {
+        if (pads[n].pad != NULL) SDL_CloseGamepad(pads[n].pad);
+        pads[n].pad = NULL;
+    }
+    SDL_QuitSubSystem(SDL_INIT_GAMEPAD);
+}
 
 void  archUpdateJoystick(void) {}
-UInt8 archJoystickGetState(int joystickNo) { return 0; }
-int   archJoystickGetCount(void) { return 0; }
-char* archJoystickGetName(int index) { return ""; }
+UInt8 archJoystickGetState(int joystickNo) { return 0; }   /* joysticks go through keys */
+
+int archJoystickGetCount(void)
+{
+    int n, count = 0;
+    for (n = 0; n < PAD_MAX; n++) if (pads[n].pad != NULL) count++;
+    return count;
+}
+
+char* archJoystickGetName(int index)
+{
+    int n;
+    for (n = 0; n < PAD_MAX; n++) {
+        if (pads[n].pad != NULL && index-- == 0) return pads[n].name;
+    }
+    return "";
+}
 
 /* ---- Mouse ---------------------------------------------------------------- */
 

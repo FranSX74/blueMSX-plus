@@ -79,6 +79,17 @@ typedef struct {
     const char* filters;
 } FrontendFileRequest;
 
+/* Picking one file inside a zip that holds several. */
+typedef struct {
+    const char* title;
+    const char* description;
+    const char* zipName;
+    const char* const* items;
+    int  count;
+    int  selected;      /* preselected item, or -1 */
+    int  autostart;     /* in/out: "reset after insert"; -1 hides the option */
+} FrontendListRequest;
+
 typedef enum {
     FRONTEND_MESSAGE_INFO,          /* transient notice (toast) */
     FRONTEND_MESSAGE_WARNING,
@@ -121,6 +132,10 @@ typedef struct FrontendHooks {
     /* Modal file chooser. Writes the chosen path into `out` and returns 1,
     ** or returns 0 when cancelled. */
     int  (*chooseFile)(const FrontendFileRequest* request, char* out, int outSize);
+
+    /* Modal list chooser. Returns the chosen index, or -1 when cancelled;
+    ** may update request->autostart. */
+    int  (*chooseFromList)(FrontendListRequest* request);
 } FrontendHooks;
 
 #ifdef __cplusplus

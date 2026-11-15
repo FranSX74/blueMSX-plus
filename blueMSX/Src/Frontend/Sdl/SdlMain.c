@@ -1,11 +1,9 @@
 /*****************************************************************************
 ** blueMSX+ - minimal SDL3 frontend
 **
-** A window showing the emulated screen, with no menus. It exercises the
-** platform layer and is the starting point for the Dear ImGui frontend.
-**
-** Keys: F6 cartridge 1, F7 disk A, F8 cassette, F9 reset, F10 pause,
-**       F11 fullscreen, F12 quit. Media files can also be dropped on the window.
+** A window showing the emulated screen, with no menus: the keyboard
+** shortcuts of the active profile work, and media files can be dropped on
+** the window. bluemsx-plus-imgui is the full frontend.
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -80,7 +78,13 @@ static void presentFrame(void)
     SDL_UpdateTexture(texture, NULL, pixels, TEX_WIDTH * 4);
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
-    SDL_RenderTexture(renderer, texture, NULL, NULL);
+    {
+        int x, y, w, h;
+        SDL_FRect src;
+        platformScreenSourceRect(RENDER_ZOOM, &x, &y, &w, &h);
+        src.x = (float)x; src.y = (float)y; src.w = (float)w; src.h = (float)h;
+        SDL_RenderTexture(renderer, texture, &src, NULL);
+    }
     SDL_RenderPresent(renderer);
 }
 
@@ -192,18 +196,6 @@ static int hookChooseFile(const FrontendFileRequest* req, char* out, int outSize
 
 static void handleKey(const SDL_KeyboardEvent* key)
 {
-    if (key->down && !key->repeat) {
-        switch (key->scancode) {
-        case SDL_SCANCODE_F6:  actionCartInsert1(); return;
-        case SDL_SCANCODE_F7:  actionDiskInsertA(); return;
-        case SDL_SCANCODE_F8:  actionCasInsert(); return;
-        case SDL_SCANCODE_F9:  actionEmuResetSoft(); return;
-        case SDL_SCANCODE_F10: actionEmuTogglePause(); return;
-        case SDL_SCANCODE_F11: actionFullscreenToggle(); return;
-        case SDL_SCANCODE_F12: quitRequested = 1; return;
-        default: break;
-        }
-    }
     if (!key->repeat) {
         platformKeyEvent(key->scancode, key->down);
     }
@@ -211,6 +203,7 @@ static void handleKey(const SDL_KeyboardEvent* key)
 
 static void handleEvent(const SDL_Event* ev)
 {
+    platformHandleSdlEvent(ev);
     switch (ev->type) {
     case SDL_EVENT_QUIT:
         quitRequested = 1;

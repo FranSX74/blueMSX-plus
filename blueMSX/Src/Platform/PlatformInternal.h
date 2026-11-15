@@ -13,6 +13,7 @@ extern "C" {
 
 /* Never NULL: an all-NULL table until platformInit. */
 const FrontendHooks* platformHooks(void);
+void platformInputShutdown(void);
 
 void platformInputInit(void);
 void platformFrontendMouseCapture(int capture);

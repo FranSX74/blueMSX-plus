@@ -19,6 +19,8 @@
 #include "ArchNotifications.h"
 #include "Properties.h"
 #include "MediaDb.h"
+#include "Language.h"
+#include <stdlib.h>
 
 #include <stdio.h>
 #include <string.h>
@@ -296,28 +298,75 @@ char* archFileSave(char* title, char* extensionList, char* defaultDir, char* ext
     return choose(FRONTEND_FILE_SAVE_GENERIC, 0, 1, 0, 1, title, defaultDir, NULL, NULL, NULL);
 }
 
-/* Choosing one entry inside a multi-file zip needs a list picker; the
-** frontends will provide it. Until then the zip is not opened. */
+/* ---- One file out of a zip ------------------------------------------------ */
+
+static char* chooseInZip(const char* title, const char* description, const char* zipName,
+                         const char* fileList, int count, const char* current, int* autostart)
+{
+    static char chosen[512];
+    const char** items;
+    FrontendListRequest req;
+    const char* p = fileList;
+    int i;
+    int index;
+
+    if (platformHooks()->chooseFromList == NULL || fileList == NULL || count <= 0) {
+        return NULL;
+    }
+    items = (const char**)calloc(count, sizeof(char*));
+    if (items == NULL) return NULL;
+
+    memset(&req, 0, sizeof(req));
+    req.title = title;
+    req.description = description;
+    req.zipName = zipName;
+    req.items = items;
+    req.count = count;
+    req.selected = -1;
+    req.autostart = autostart ? *autostart : -1;
+    for (i = 0; i < count; i++) {
+        items[i] = p;
+        if (current && strcmp(current, p) == 0) req.selected = i;
+        p += strlen(p) + 1;
+    }
+
+    index = platformHooks()->chooseFromList(&req);
+    if (index >= 0 && index < count) {
+        snprintf(chosen, sizeof(chosen), "%s", items[index]);
+        if (autostart && *autostart != -1) *autostart = req.autostart;
+    }
+    free(items);
+    return index >= 0 && index < count ? chosen : NULL;
+}
+
 char* archFilenameGetOpenRomZip(Properties* properties, int cartSlot, const char* fname,
                                 const char* fileList, int count, int* autostart, int* romType)
 {
-    return NULL;
+    char* name = chooseInZip(langDlgLoadRom(), langDlgLoadRomDesc(), fname, fileList, count,
+                             properties->media.carts[cartSlot ? 1 : 0].fileNameInZip, autostart);
+    if (name && romType) *romType = ROM_UNKNOWN;
+    return name;
 }
 
 char* archFilenameGetOpenDiskZip(Properties* properties, int drive, const char* fname,
                                  const char* fileList, int count, int* autostart)
 {
-    return NULL;
+    return chooseInZip(langDlgLoadDsk(), langDlgLoadDskDesc(), fname, fileList, count,
+                       properties->media.disks[drive ? 1 : 0].fileNameInZip, autostart);
 }
 
 char* archFilenameGetOpenCasZip(Properties* properties, const char* fname,
                                 const char* fileList, int count, int* autostart)
 {
-    return NULL;
+    return chooseInZip(langDlgLoadCas(), langDlgLoadCasDesc(), fname, fileList, count,
+                       properties->media.tapes[0].fileNameInZip, autostart);
 }
 
 char* archFilenameGetOpenAnyZip(Properties* properties, const char* fname,
                                 const char* fileList, int count, int* autostart, int* romType)
 {
-    return NULL;
+    char* name = chooseInZip(langDlgLoadRomDskCas(), langDlgLoadRomDskCasDesc(), fname,
+                             fileList, count, NULL, autostart);
+    if (name && romType) *romType = ROM_UNKNOWN;
+    return name;
 }

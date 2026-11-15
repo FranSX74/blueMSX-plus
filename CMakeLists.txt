@@ -9,7 +9,8 @@
 #                     is read from the Visual Studio project, so both builds
 #                     stay in step.
 #   bluemsx-platform  arch* implementation on SDL3 + POSIX (Src/Platform).
-#   frontends         bluemsx-plus-sdl (minimal); ImGui and Qt6 come next.
+#   frontends         bluemsx-plus-imgui (Dear ImGui), bluemsx-plus-sdl
+#                     (minimal); Qt6 comes next.
 #
 # Windows keeps building with Make/msvc20xx/blueMSX.sln.
 
@@ -18,6 +19,7 @@ project(bluemsx-plus VERSION 3.1.1 LANGUAGES C CXX)
 
 include(GNUInstallDirs)
 
+option(BLUEMSX_FRONTEND_IMGUI "Build the Dear ImGui frontend (bluemsx-plus-imgui)" ON)
 option(BLUEMSX_FRONTEND_SDL "Build the minimal SDL3 frontend (bluemsx-plus-sdl)" ON)
 option(BLUEMSX_SANITIZE "Build with AddressSanitizer and UBSan" OFF)
 
@@ -131,6 +133,23 @@ endfunction()
 
 if(BLUEMSX_FRONTEND_SDL)
     bluemsx_frontend(bluemsx-plus-sdl ${BMX}/Src/Frontend/Sdl/SdlMain.c)
+endif()
+
+if(BLUEMSX_FRONTEND_IMGUI)
+    # Dear ImGui is vendored (third_party/imgui, MIT) with its SDL3 backends.
+    set(IMGUI_DIR ${CMAKE_SOURCE_DIR}/third_party/imgui)
+    add_library(imgui STATIC
+        ${IMGUI_DIR}/imgui.cpp ${IMGUI_DIR}/imgui_draw.cpp ${IMGUI_DIR}/imgui_tables.cpp
+        ${IMGUI_DIR}/imgui_widgets.cpp ${IMGUI_DIR}/imgui_demo.cpp
+        ${IMGUI_DIR}/backends/imgui_impl_sdl3.cpp ${IMGUI_DIR}/backends/imgui_impl_sdlrenderer3.cpp)
+    target_include_directories(imgui PUBLIC ${IMGUI_DIR} ${IMGUI_DIR}/backends)
+    target_link_libraries(imgui PUBLIC SDL3::SDL3)
+
+    set(BMX_IMGUI ${BMX}/Src/Frontend/ImGui)
+    bluemsx_frontend(bluemsx-plus-imgui
+        ${BMX_IMGUI}/ImGuiMain.cpp ${BMX_IMGUI}/ImGuiMenus.cpp ${BMX_IMGUI}/ImGuiDialogs.cpp
+        ${BMX_IMGUI}/ImGuiFileDialog.cpp ${BMX_IMGUI}/ImGuiProperties.cpp ${BMX_IMGUI}/ImGuiShortcuts.cpp)
+    target_link_libraries(bluemsx-plus-imgui PRIVATE imgui)
 endif()
 
 # ---- Data -------------------------------------------------------------------

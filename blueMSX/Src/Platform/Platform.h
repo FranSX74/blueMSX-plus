@@ -38,6 +38,13 @@ int  platformInit(int argc, char** argv, const FrontendHooks* hooks);
 void platformShutdown(void);
 
 struct Properties* platformGetProperties(void);
+
+/* Applies settings a frontend dialog changed in platformGetProperties()
+** (video, sound, mixer, ports, switches, language, shortcut profile). `old`
+** is a copy taken before the change. Settings are saved at exit, or now with
+** platformSaveProperties. */
+void platformApplyProperties(const struct Properties* old);
+void platformSaveProperties(void);
 struct Video*      platformGetVideo(void);
 struct Mixer*      platformGetMixer(void);
 
@@ -48,6 +55,12 @@ struct Mixer*      platformGetMixer(void);
 ** line. Returns the zoom actually used. UI thread only. */
 int  platformRenderFrame(void* dst, int pitch, int zoom);
 
+/* The part of the rendered frame to show, in pixels of the zoomed frame:
+** with horizontal stretch the side borders are cropped away, with vertical
+** stretch 7 lines top and bottom, as the Win32 frontend does. The caller
+** scales that rectangle to its 4:3 screen area. */
+void platformScreenSourceRect(int zoom, int* x, int* y, int* w, int* h);
+
 /* Tells the emulator the frame requested by displayUpdate was presented. */
 void platformDisplayDone(void);
 
@@ -56,6 +69,11 @@ void platformDisplayDone(void);
 /* Keys are USB HID usage codes, the numbering of SDL_Scancode. */
 void platformKeyEvent(int scancode, int pressed);
 void platformKeyboardFocus(int focused);
+
+/* Gamepad hot-plug, buttons and axes: pass every SDL event (UI thread).
+** Other events are ignored. */
+union SDL_Event;
+void platformHandleSdlEvent(const union SDL_Event* event);
 
 /* Relative motion in host pixels, and the absolute position normalised to
 ** 0..1 over the emulated screen (for light guns and the like). */
