@@ -61,6 +61,14 @@ int  platformRenderFrame(void* dst, int pitch, int zoom);
 ** scales that rectangle to its 4:3 screen area. */
 void platformScreenSourceRect(int zoom, int* x, int* y, int* w, int* h);
 
+/* Whether the last rendered frame was interlaced (480i or the VDP's IL
+** raster), where scanlines are left out as on a real set. */
+int  platformLastFrameInterlaced(void);
+
+/* The frontend draws the scanlines on the GPU: the software renderer leaves
+** them out. */
+void platformSetGpuScanlines(int on);
+
 /* Tells the emulator the frame requested by displayUpdate was presented. */
 void platformDisplayDone(void);
 

@@ -176,7 +176,7 @@ if(BLUEMSX_FRONTEND_QT)
     bluemsx_frontend(qbluemsx ${BMX_FRONTEND_COMMON}
         ${BMX_QT}/QtApp.h ${BMX_QT}/QtMain.cpp ${BMX_QT}/QtKeymap.cpp ${BMX_QT}/QtDialogs.cpp
         ${BMX_QT}/QtTest.cpp ${BMX_QT}/QtTheme.cpp
-        ${BMX_QT}/QtProperties.cpp ${BMX_QT}/QtShortcuts.cpp)
+        ${BMX_QT}/QtProperties.cpp ${BMX_QT}/QtShortcuts.cpp ${BMX_QT}/QtScreenGL.cpp)
     set_target_properties(qbluemsx PROPERTIES AUTOMOC ON)
     # The core has a field named "slots": keep Qt keywords as Q_SLOTS, Q_EMIT...
     target_compile_definitions(qbluemsx PRIVATE QT_NO_KEYWORDS)

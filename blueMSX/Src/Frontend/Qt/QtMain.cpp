@@ -203,25 +203,8 @@ void ScreenWidget::uploadFrame()
     for (qsizetype i = 0, n = qsizetype(frame.width()) * frame.height(); i < n; i++) {
         px[i] |= 0xff000000u;
     }
+    frameDirty = true;
     update();
-}
-
-void ScreenWidget::paintGL()
-{
-    QPainter p(this);
-    int w = width(), h = height();
-    int sw = w, sh = w * 3 / 4;
-    if (sh > h) {
-        sh = h;
-        sw = h * 4 / 3;
-    }
-    screenArea = QRect((w - sw) / 2, (h - sh) / 2, sw, sh);
-    int sx, sy, sxw, syh;
-    platformScreenSourceRect(QBM_RENDER_ZOOM, &sx, &sy, &sxw, &syh);
-
-    p.fillRect(rect(), Qt::black);
-    p.setRenderHint(QPainter::SmoothPixmapTransform, false);
-    p.drawImage(screenArea, frame, QRect(sx, sy, sxw, syh));
 }
 
 void ScreenWidget::showNotice(const QString& text)

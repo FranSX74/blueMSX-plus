@@ -272,6 +272,53 @@ static QWidget* pageEmulation(std::vector<std::function<void()>>* syncs)
     return page;
 }
 
+/* Scanline shape, as in the Windows Direct3D 12 options: the floor between
+** lines (scanlinesPct, shown as depth = 100 - floor), the sin^p exponent
+** (scanlinesShapePct / 25) and the brightness compensation. The presets set
+** depth and shape; moving the sliders selects the matching one or Custom. */
+static int scanlinePreset(int floorPct, int shapePct)
+{
+    if (floorPct == 30 && shapePct == 25)  return 0;     /* Gentle */
+    if (floorPct == 0  && shapePct == 50)  return 1;     /* Standard CRT */
+    if (floorPct == 0  && shapePct == 75)  return 2;     /* Sharp */
+    if (floorPct == 0  && shapePct == 100) return 3;     /* Trinitron */
+    return 4;                                             /* Custom */
+}
+
+static void scanlineControls(Page* page, Properties* p)
+{
+    auto on = [p]() { return p->video.scanlinesEnable != 0; };
+
+    /* Keep the preset in step with the sliders (no apply needed: it only
+    ** names the pair). Registered before the combo so that shows it. */
+    page->onSync([p]() {
+        p->video.scanlinesShapeMode = scanlinePreset(p->video.scanlinesPct, p->video.scanlinesShapePct);
+    });
+    QComboBox* preset = page->combo(langPropMonScanlinesShape(), &p->video.scanlinesShapeMode,
+        { u8(langEnumScanShapeGentle()), u8(langEnumScanShapeStandard()), u8(langEnumScanShapeSharp()),
+          u8(langEnumScanShapeTrinitron()), u8(langEnumScanShapeCustom()) }, on);
+    QObject::connect(preset, &QComboBox::activated, [](int i) {
+        static const int floors[] = { 30, 0, 0, 0 };
+        static const int shapes[] = { 25, 50, 75, 100 };
+        if (i < 0 || i > 3) return;
+        change([i](Properties* q) {
+            q->video.scanlinesPct = floors[i];
+            q->video.scanlinesShapePct = shapes[i];
+        });
+    });
+
+    QSlider* depth = page->slider(langPropMonScanlinesDepth(), &p->video.scanlinesPct, 0, 100, -1,
+                                  [](int v) { return pct(100 - v); }, on);
+    depth->setInvertedAppearance(true);         /* right = deeper lines */
+    page->slider(langPropMonScanlinesSharpness(), &p->video.scanlinesShapePct, 0, 100, 50,
+                 [](int v) { return QString("p = %1").arg(v / 25.0, 0, 'f', 2); }, on);
+    page->check(langPropMonScanlinesBrightAuto(), &p->video.scanlinesBrightAuto, on)
+        ->setText(u8(langPropMonScanlinesBright()) + u8(langPropMonScanlinesBrightAuto()));
+    page->slider(langPropMonScanlinesBright(), &p->video.scanlinesBrightPct, 100, 200, 100,
+                 [](int v) { return QString("%1x").arg(v / 100.0, 0, 'f', 2); },
+                 [p]() { return p->video.scanlinesEnable && !p->video.scanlinesBrightAuto; });
+}
+
 static QWidget* pageVideo(std::vector<std::function<void()>>* syncs)
 {
     Properties* p = platformGetProperties();
@@ -295,13 +342,15 @@ static QWidget* pageVideo(std::vector<std::function<void()>>* syncs)
     page->check(langPropMonDeInterlace(), &p->video.deInterlace);
     page->check(langPropMonBlendFrames(), &p->video.blendFrames);
     page->check(langPropMonScanlines(), &p->video.scanlinesEnable);
-    page->slider(langPropMonScanlinesDepth(), &p->video.scanlinesPct, 0, 100, -1, pct,
-                 [p]() { return p->video.scanlinesEnable != 0; });
+    scanlineControls(page, p);
     page->check(langPropMonColorGhosting(), &p->video.colorSaturationEnable);
     page->slider("", &p->video.colorSaturationWidth, 0, 4, -1, num,
                  [p]() { return p->video.colorSaturationEnable != 0; });
 
     page->group(langPropVideo());
+    page->combo(langPropD3DScalingFilterText(), &p->video.d3d.scalingFilter,
+                { u8(langEnumD3DScaleNearest()), u8(langEnumD3DScaleSharp()), u8(langEnumD3DScalePrescaled()),
+                  u8(langEnumD3DScaleBilinear()) });
     page->slider(langPropMonBrightness(), &p->video.brightness, 0, 200, 100, num);
     page->slider(langPropMonContrast(), &p->video.contrast, 0, 200, 100, num);
     page->slider(langPropMonSaturation(), &p->video.saturation, 0, 200, 100, num);

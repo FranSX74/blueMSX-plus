@@ -17,11 +17,13 @@ extern "C" {
 
 #include <QImage>
 #include <QMainWindow>
+#include <QOpenGLFunctions>
 #include <QOpenGLWidget>
 #include <functional>
 #include <vector>
 
 class QKeyEvent;
+class QOpenGLShaderProgram;
 class QLabel;
 class QMenu;
 class QMenuBar;
@@ -43,7 +45,7 @@ int hidFromKeyEvent(const QKeyEvent* e);
 
 /* ---- The emulated screen --------------------------------------------------- */
 
-class ScreenWidget : public QOpenGLWidget {
+class ScreenWidget : public QOpenGLWidget, protected QOpenGLFunctions {
     Q_OBJECT
 public:
     explicit ScreenWidget(QWidget* parent = nullptr);
@@ -55,6 +57,7 @@ public:
     QRect screenRect() const { return screenArea; }
 
 protected:
+    void initializeGL() override;
     void paintGL() override;
     void keyPressEvent(QKeyEvent* e) override;
     void keyReleaseEvent(QKeyEvent* e) override;
@@ -66,7 +69,15 @@ protected:
     bool focusNextPrevChild(bool) override { return false; }   /* Tab is an MSX key */
 
 private:
+    /* QtScreenGL.cpp: the frame drawn by a shader (sharp scaling, scanlines
+    ** at the output resolution); QPainter when that is not available. */
+    bool drawWithShader();
+    void drawWithPainter();
+
     QImage frame;
+    bool   frameDirty = true;
+    QOpenGLShaderProgram* program = nullptr;
+    unsigned texture = 0;
     QRect  screenArea;
     QPoint lastMouse;
     bool   captured = false;

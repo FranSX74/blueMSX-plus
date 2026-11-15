@@ -170,6 +170,9 @@ static void setupDirectories(void)
 
 /* ---- Start and stop ------------------------------------------------------- */
 
+/* The frontend draws scanlines itself (GPU), at the output resolution. */
+static int gpuScanlines = 0;
+
 static void buildCommandLine(int argc, char** argv, char* out, int outSize)
 {
     int i;
@@ -452,6 +455,7 @@ void platformShutdown(void)
 /* ---- Display -------------------------------------------------------------- */
 
 static int lastMaxWidth = PLATFORM_SCREEN_WIDTH;
+static int lastInterlaced = 0;
 
 int platformRenderFrame(void* dst, int pitch, int zoom)
 {
@@ -463,8 +467,15 @@ int platformRenderFrame(void* dst, int pitch, int zoom)
         frameBuffer = frameBufferGetWhiteNoiseFrame();
     }
 
+    /* Menu actions reset the renderer from the properties: with GPU
+    ** scanlines the software ones stay off. */
+    if (gpuScanlines) {
+        videoSetScanLines(video, 0, properties->video.scanlinesPct);
+    }
+
     /* videoRender takes the unzoomed border in bytes and clears it itself. */
     lastMaxWidth = frameBuffer->maxWidth;
+    lastInterlaced = frameBuffer->interlace != INTERLACE_NONE || frameBuffer->interlaceRaster;
     borderWidth = (PLATFORM_SCREEN_WIDTH - frameBuffer->maxWidth) / 2;
     return videoRender(video, frameBuffer, 32, zoom, dst,
                        borderWidth > 0 ? borderWidth * 4 : 0, pitch, -1);
@@ -486,6 +497,20 @@ void platformScreenSourceRect(int zoom, int* x, int* y, int* w, int* h)
     *y = crop * zoom;
     *w = (PLATFORM_SCREEN_WIDTH - 2 * border) * zoom;
     *h = (PLATFORM_SCREEN_HEIGHT - 2 * crop) * zoom;
+}
+
+int platformLastFrameInterlaced(void)
+{
+    return lastInterlaced;
+}
+
+void platformSetGpuScanlines(int on)
+{
+    gpuScanlines = on ? 1 : 0;
+    if (video != NULL && properties != NULL) {
+        videoSetScanLines(video, properties->video.scanlinesEnable && !gpuScanlines,
+                          properties->video.scanlinesPct);
+    }
 }
 
 void platformDisplayDone(void)
