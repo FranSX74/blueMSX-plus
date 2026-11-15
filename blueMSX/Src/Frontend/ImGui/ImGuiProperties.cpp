@@ -216,8 +216,9 @@ static void pageSound(Properties* p)
     if (!stopped) ImGui::TextDisabled("%s", langPropSoundChipsHint());
 
     heading(langPropSoundChipsActive());
-    static const char* const ym[] = { "openMSX", "openMSX (2)", "emu2413", "Nuked-OPLL" };
-    static const char* const y8950[] = { "blueMSX", "emu8950", "openMSX" };
+    /* Same labels as the Win32 dialog, indexed by PROP_YM2413_BACKEND_*. */
+    static const char* const ym[] = { "openMSX", "original blueMSX", "emu2413", "Nuked OPLL" };
+    static const char* const y8950[] = { "original blueMSX", "emu8950", "openMSX" };
     int ya = p->sound.chip.ym2413BackendActive, yb = p->sound.chip.y8950BackendActive;
     ImGui::Text("MSX-MUSIC: %s", ya >= 0 && ya < 4 ? ym[ya] : "?");
     ImGui::SameLine();
@@ -229,9 +230,17 @@ static void pageSound(Properties* p)
     const char* filters[] = { langEnumOpllFilterOff(), langEnumOpllFilterBright(), langEnumOpllFilterClear(),
                               langEnumOpllFilterStandard(), langEnumOpllFilterSoft(),
                               langEnumOpllFilterMellow(), langEnumOpllFilterCustom() };
+    /* The original blueMSX OPLL has its own output filter, so the analog
+    ** filter is bypassed with it (YM2413.cpp), as the Win32 dialog shows. */
+    bool filterUsed = ya != PROP_YM2413_BACKEND_OPENMSX_2;
+    ImGui::BeginDisabled(!filterUsed);
     combo(langPropSndOpllAnalogText(), &p->sound.chip.ym2413AnalogFilterMode, filters, PROP_OPLL_FILTER_COUNT);
     if (p->sound.chip.ym2413AnalogFilterMode == PROP_OPLL_FILTER_CUSTOM) {
-        ImGui::SliderInt(langPropSndOpllAnalogLpfText(), &p->sound.chip.ym2413AnalogFilterLpfHz, 1000, 20000, "%d Hz");
+        ImGui::SliderInt(langPropSndOpllAnalogLpfText(), &p->sound.chip.ym2413AnalogFilterLpfHz, 1000, 15000, "%d Hz");
+    }
+    ImGui::EndDisabled();
+    if (!filterUsed) {
+        ImGui::SetItemTooltip("Not used with the %s MSX-MUSIC backend.", ym[ya]);
     }
 }
 

@@ -36,6 +36,7 @@
 #include "SysRomLocator.h"
 #include "UartIO.h"
 #include "VideoRender.h"
+#include "YM2413.h"
 #include "Switches.h"
 
 #include <SDL3/SDL.h>
@@ -384,6 +385,20 @@ void platformApplyProperties(const Properties* old)
         boardSetY8950Enable(p->sound.chip.enableY8950);
         boardSetYm2413Enable(p->sound.chip.enableYM2413);
         boardSetMoonsoundEnable(p->sound.chip.enableMoonsound);
+    }
+
+    /* OPLL analog filter: a preset overwrites the stored cutoffs, Custom keeps
+    ** the slider value; the live YM2413 picks the change up at once. */
+    if (old->sound.chip.ym2413AnalogFilterMode  != p->sound.chip.ym2413AnalogFilterMode ||
+        old->sound.chip.ym2413AnalogFilterLpfHz != p->sound.chip.ym2413AnalogFilterLpfHz ||
+        old->sound.chip.ym2413AnalogFilterHpfHz != p->sound.chip.ym2413AnalogFilterHpfHz) {
+        int lpf = 0, hpf = 0;
+        propertiesGetOpllFilterHz(p->sound.chip.ym2413AnalogFilterMode, &p->sound.chip, &lpf, &hpf);
+        if (p->sound.chip.ym2413AnalogFilterMode != PROP_OPLL_FILTER_CUSTOM) {
+            p->sound.chip.ym2413AnalogFilterLpfHz = lpf;
+            p->sound.chip.ym2413AnalogFilterHpfHz = hpf;
+        }
+        ym2413AnalogFilterSet(lpf, hpf);
     }
 
     for (i = 0; i < MIXER_CHANNEL_TYPE_COUNT; i++) {
