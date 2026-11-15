@@ -117,6 +117,7 @@ static void hookWindowCommand(FrontendWindowCommand cmd)
     case FRONTEND_WINDOW_MINIMIZE: SDL_MinimizeWindow(window); break;
     case FRONTEND_WINDOW_MAXIMIZE: SDL_MaximizeWindow(window); break;
     case FRONTEND_WINDOW_CLOSE:    quitRequested = true; break;
+    default: break;              /* skin commands: ImGui has no skins */
     }
 }
 

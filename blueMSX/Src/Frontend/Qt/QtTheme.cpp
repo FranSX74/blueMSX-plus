@@ -20,9 +20,11 @@ extern "C" {
 #include "ArchText.h"
 #include "Theme.h"
 #include "ThemeClassic.h"
+#include "ThemeLoader.h"
 }
 
 #include <QApplication>
+#include <QDir>
 #include <QFont>
 #include <QFontMetricsF>
 #include <QtMath>
@@ -372,11 +374,34 @@ void ThemeView::setActive(bool active)
 
 static std::vector<ThemeCollection*> builtins;
 
+/* Skins in <dir>/Themes/<name>/theme.xml; only the name is read here, the
+** rest when the skin is first used. The user's folders come first, so a
+** skin there hides a shipped one of the same name. */
+static void addThemesFrom(const char* base)
+{
+    if (base == NULL || base[0] == 0) return;
+    QDir dir(QDir(QString::fromUtf8(base)).filePath("Themes"));
+    const QStringList subdirs = dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name | QDir::IgnoreCase);
+    for (const QString& sub : subdirs) {
+        ThemeCollection* tc = themeLoadSkeleton(dir.filePath(sub).toUtf8().constData());
+        if (tc == NULL) continue;
+        bool dup = false;
+        for (ThemeCollection* other : builtins) dup = dup || strcmp(other->name, tc->name) == 0;
+        if (dup) themeCollectionDestroy(tc);
+        else builtins.push_back(tc);
+    }
+}
+
 std::vector<ThemeCollection*>& themeList()
 {
     if (builtins.empty()) {
         builtins.push_back(themeClassicCreate());
         builtins.push_back(themeClassicCreateDark());
+        for (ThemeCollection* tc : builtins) tc->loaded = 1;
+        const PlatformPaths* paths = platformPaths();
+        addThemesFrom(paths->configDir);
+        addThemesFrom(paths->legacyDir);
+        addThemesFrom(paths->dataDir);
     }
     return builtins;
 }

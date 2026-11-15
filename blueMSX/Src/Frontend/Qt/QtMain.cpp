@@ -38,6 +38,7 @@ extern "C" {
 
 extern "C" {
 #include "Theme.h"
+#include "ThemeLoader.h"
 }
 #include <cstring>
 
@@ -327,6 +328,10 @@ static ThemePage* pageForZoom(int zoom)
 {
     ThemeCollection* tc = selectedTheme();
     if (tc == NULL) return NULL;
+    /* External skins are parsed on first use; their zooms other than the
+    ** designed ones are the "normal" page scaled by zoom/2. */
+    if (!themeCollectionEnsureLoaded(tc)) return NULL;
+    if (zoom < THEME_ZOOM_COUNT) themeCollectionEnsureZoom(tc, zoom);
     Theme* theme = zoom < THEME_ZOOM_COUNT ? tc->zoom[zoom] : NULL;
     if (theme == NULL && zoom != 1) theme = tc->zoom[2];
     return theme ? themeGetCurrentPage(theme) : NULL;
@@ -488,6 +493,13 @@ static void hookWindowCommand(FrontendWindowCommand cmd)
     case FRONTEND_WINDOW_MINIMIZE: theWindow->showMinimized(); break;
     case FRONTEND_WINDOW_MAXIMIZE: theWindow->showMaximized(); break;
     case FRONTEND_WINDOW_CLOSE:    theWindow->close(); break;
+    case FRONTEND_WINDOW_START_MOVE:
+        if (QWindow* w = theWindow->windowHandle()) w->startSystemMove();
+        break;
+    case FRONTEND_WINDOW_THEME_PAGE:
+        /* Called while the skin is drawing a button press: relayout after. */
+        QTimer::singleShot(0, []() { if (theWindow) theWindow->applyWindowSettings(); });
+        break;
     }
 }
 

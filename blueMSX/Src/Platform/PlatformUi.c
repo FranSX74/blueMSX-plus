@@ -163,13 +163,14 @@ void archCaptureToastSaved(const char* savedPath)
     platformFrontendMessage(FRONTEND_MESSAGE_INFO, msg);
 }
 
-/* Theme (skin) and child window hooks belong to the classic Win32 UI. */
+/* Skin hooks: page switches and window drags go to the frontend; theme child
+** windows belong to the Win32 UI. */
 void  archThemeSetNext(void) {}
-void  archThemeUpdate(struct Theme* theme) {}
+void  archThemeUpdate(struct Theme* theme) { windowCommand(FRONTEND_WINDOW_THEME_PAGE); }
 void* archWindowCreate(struct Theme* theme, int childWindow) { return NULL; }
 void  archWindowApplyOwnership(void* hwnd) {}
 void  archWindowApplyOwnershipAll(void) {}
-void  archWindowStartMove(void) {}
+void  archWindowStartMove(void) { windowCommand(FRONTEND_WINDOW_START_MOVE); }
 void  archWindowMove(void) {}
 void  archWindowEndMove(void) {}
 

@@ -99,7 +99,9 @@ typedef enum {
 typedef enum {
     FRONTEND_WINDOW_MINIMIZE,
     FRONTEND_WINDOW_MAXIMIZE,
-    FRONTEND_WINDOW_CLOSE
+    FRONTEND_WINDOW_CLOSE,
+    FRONTEND_WINDOW_START_MOVE,     /* a skin's drag area was pressed */
+    FRONTEND_WINDOW_THEME_PAGE      /* the skin switched page (size may change) */
 } FrontendWindowCommand;
 
 typedef struct FrontendHooks {

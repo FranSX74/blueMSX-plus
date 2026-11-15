@@ -1684,6 +1684,9 @@ static TiXmlElement* themeOpenXml(const char* themePath, TiXmlDocument& doc)
 
     FILE* f = fopen(fullPath("Theme.xml"), "rb");
     if (f == NULL) {
+        f = fopen(fullPath("theme.xml"), "rb");   /* case-sensitive file systems */
+    }
+    if (f == NULL) {
         return NULL;
     }
     int len = (int)fread(themeData, 1, sizeof(themeData), f);
