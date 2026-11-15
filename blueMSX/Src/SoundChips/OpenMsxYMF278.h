@@ -13,7 +13,7 @@ using namespace std;
 
 
 typedef unsigned long  EmuTime;
-typedef unsigned char  byte;
+typedef unsigned char  omsx_byte;
 typedef unsigned short word;
 
 
@@ -81,12 +81,12 @@ class YMF278Slot
 		int pos;
 
 		bool active;		// slot keyed on
-		byte bits;		// width of the samples
+		omsx_byte bits;		// width of the samples
 		int startaddr;
 		int loopaddr;
 		int endaddr;
 
-		byte state;
+		omsx_byte state;
 		int env_vol;
 
 		bool lfo_active;
@@ -102,11 +102,11 @@ class YMF278 : public SoundDevice
 		       const EmuTime &time);
 		virtual ~YMF278();
 		void reset(const EmuTime &time);
-		void writeRegOPL4(byte reg, byte data, const EmuTime &time);
-		byte peekRegOPL4(byte reg, const EmuTime &time);
-		byte readRegOPL4(byte reg, const EmuTime &time);
-		byte peekStatus(const EmuTime &time);
-		byte readStatus(const EmuTime &time);
+		void writeRegOPL4(omsx_byte reg, omsx_byte data, const EmuTime &time);
+		omsx_byte peekRegOPL4(omsx_byte reg, const EmuTime &time);
+		omsx_byte readRegOPL4(omsx_byte reg, const EmuTime &time);
+		omsx_byte peekStatus(const EmuTime &time);
+		omsx_byte readStatus(const EmuTime &time);
 		// the BUSY flag is shared with register selects and FM writes
 		void setBusyUntil(const EmuTime &time) { BUSY_Time = time; }
         void* getRom() { return rom; }	
@@ -123,8 +123,8 @@ class YMF278 : public SoundDevice
 	private:
 		void setupMemoryPointers();
 		void generateSample(int* outLeft, int* outRight);
-		byte readMem(unsigned int address);
-		void writeMem(unsigned int address, byte value);
+		omsx_byte readMem(unsigned int address);
+		void writeMem(unsigned int address, omsx_byte value);
 		short getSample(YMF278Slot &op, unsigned int pos);
 		unsigned int nextPos(YMF278Slot &op, unsigned int pos, unsigned int increment);
 		void advance();
@@ -133,8 +133,8 @@ class YMF278 : public SoundDevice
 		void keyOnHelper(YMF278Slot& slot);
 
 		int buffer[AUDIO_STEREO_BUFFER_SIZE];
-		byte* rom;
-		byte* ram;
+		omsx_byte* rom;
+		omsx_byte* ram;
 
         int oplOversampling;
 		DoubleT freqbase;
@@ -157,7 +157,7 @@ class YMF278 : public SoundDevice
 
 		unsigned int endRom;
 		unsigned int endRam;
-		byte* memPtrs[32];	// 128kB chunk map of the 4MB space
+		omsx_byte* memPtrs[32];	// 128kB chunk map of the 4MB space
 
 		int masterVol;		// overall gain, 8.8 fixed point
 
@@ -168,7 +168,7 @@ class YMF278 : public SoundDevice
 		int lastL, lastR;
 		int curL, curR;
 
-		byte regs[256];
+		omsx_byte regs[256];
 
 		unsigned long LD_Time;
 		unsigned long BUSY_Time;

@@ -37,7 +37,7 @@
 #include "Utf8Conv.h"   /* PathToWide / Utf8ToWide */
 #endif
 
-#include "strcmpnocase.h"
+#include "StrcmpNoCase.h"
 
 #include "blowfish.h"
 #include "authkey.h"

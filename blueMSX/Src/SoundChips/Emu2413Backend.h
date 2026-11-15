@@ -37,8 +37,8 @@ public:
     virtual ~Emu2413Backend();
 
     virtual void reset(const EmuTime& time);
-    virtual void writeReg(byte r, byte v, const EmuTime& time);
-    virtual byte peekReg(byte r);
+    virtual void writeReg(omsx_byte r, omsx_byte v, const EmuTime& time);
+    virtual omsx_byte peekReg(omsx_byte r);
 
     virtual void setInternalVolume(short newVolume);
     virtual int* updateBuffer(int length);
@@ -51,7 +51,7 @@ private:
     struct __OPLL* opll;
     short maxVolume;
     int   buffer[AUDIO_MONO_BUFFER_SIZE];
-    byte  regCache[64];
+    omsx_byte  regCache[64];
 };
 
 #endif

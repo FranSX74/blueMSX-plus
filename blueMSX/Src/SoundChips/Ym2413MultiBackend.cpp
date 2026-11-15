@@ -162,14 +162,14 @@ void Ym2413MultiBackend::reset(const EmuTime& time)
     }
 }
 
-void Ym2413MultiBackend::writeReg(byte r, byte v, const EmuTime& time)
+void Ym2413MultiBackend::writeReg(omsx_byte r, omsx_byte v, const EmuTime& time)
 {
     for (int i = 0; i < YM2413_BACKEND_COUNT; i++) {
         if (backends[i]) backends[i]->writeReg(r, v, time);
     }
 }
 
-byte Ym2413MultiBackend::peekReg(byte r)
+omsx_byte Ym2413MultiBackend::peekReg(omsx_byte r)
 {
     if (backends[g_ym2413Active]) return backends[g_ym2413Active]->peekReg(r);
     /* Fallback: pick any live backend so the debugger can still read regs. */

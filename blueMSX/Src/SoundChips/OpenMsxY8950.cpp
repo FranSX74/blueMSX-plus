@@ -424,7 +424,7 @@ void Y8950::Channel::keyOff()
 //**********************************************************//
 
 
-void Y8950::callback(byte flag)
+void Y8950::callback(omsx_byte flag)
 {
 	setStatus(flag);
 }
@@ -888,7 +888,7 @@ void Y8950::setInternalVolume(short newVolume)
 //                                                  //
 //**************************************************//
 
-void Y8950::writeReg(byte rg, byte data, const EmuTime& time)
+void Y8950::writeReg(omsx_byte rg, omsx_byte data, const EmuTime& time)
 {
 	//PRT_DEBUG("Y8950 write " << (int)rg << " " << (int)data);
 	int stbl[32] = {
@@ -1135,12 +1135,12 @@ void Y8950::writeReg(byte rg, byte data, const EmuTime& time)
 	checkMute();
 }
 
-byte Y8950::readReg(byte rg, const EmuTime &time)
+omsx_byte Y8950::readReg(omsx_byte rg, const EmuTime &time)
 {
 	// TODO only when necessary
 //	Mixer::instance().updateStream(time);
 	
-	byte result;
+	omsx_byte result;
 	switch (rg) {
 		case 0x05: // (KEYBOARD IN)
 //			result = connector.read(time); FIXME
@@ -1164,16 +1164,16 @@ byte Y8950::readReg(byte rg, const EmuTime &time)
 	return result;
 }
 
-byte Y8950::readStatus()
+omsx_byte Y8950::readStatus()
 {
 	setStatus(STATUS_BUF_RDY);	// temp hack
-	byte tmp = status & (0x80 | statusMask);
+	omsx_byte tmp = status & (0x80 | statusMask);
 	//PRT_DEBUG("Y8950 read status " << (int)tmp);
 	return tmp | 0x06;	// bit 1 and 2 are always 1
 }
 
 
-void Y8950::setStatus(byte flags)
+void Y8950::setStatus(omsx_byte flags)
 {
 	status |= flags;
 	if (status & statusMask) {
@@ -1181,7 +1181,7 @@ void Y8950::setStatus(byte flags)
 		irq.set();
 	}
 }
-void Y8950::resetStatus(byte flags)
+void Y8950::resetStatus(omsx_byte flags)
 {
 	status &= ~flags;
 	if (!(status & statusMask)) {
@@ -1189,7 +1189,7 @@ void Y8950::resetStatus(byte flags)
 		irq.reset();
 	}
 }
-void Y8950::changeStatusMask(byte newMask)
+void Y8950::changeStatusMask(omsx_byte newMask)
 {
 	statusMask = newMask;
 	status &= statusMask;
@@ -1210,12 +1210,12 @@ unsigned Y8950::getSize() const
 	return 0x100;
 }
 
-byte Y8950::read(unsigned address)
+omsx_byte Y8950::read(unsigned address)
 {
 	return reg[address];
 }
 
-void Y8950::write(unsigned address, byte value)
+void Y8950::write(unsigned address, omsx_byte value)
 {
 	writeReg(address, value, boardSystemTime());
 }

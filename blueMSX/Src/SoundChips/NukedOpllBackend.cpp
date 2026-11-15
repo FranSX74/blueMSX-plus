@@ -100,7 +100,7 @@ void NukedOpllBackend::clockAndFeed()
     }
 }
 
-void NukedOpllBackend::writeReg(byte r, byte v, const EmuTime& /*time*/)
+void NukedOpllBackend::writeReg(omsx_byte r, omsx_byte v, const EmuTime& /*time*/)
 {
     if ((r & 0x3f) < 64) regCache[r & 0x3f] = v;
 
@@ -111,7 +111,7 @@ void NukedOpllBackend::writeReg(byte r, byte v, const EmuTime& /*time*/)
     for (int i = 0; i < WRITE_SETTLE_AFTER;  i++) clockAndFeed();
 }
 
-byte NukedOpllBackend::peekReg(byte r)
+omsx_byte NukedOpllBackend::peekReg(omsx_byte r)
 {
     return regCache[r & 0x3f];
 }
@@ -452,7 +452,7 @@ void NukedOpllBackend::loadState()
     saveStateClose(sBack);
 
     /* Fallback: register-replay. Transient state (eg, pg, LFO) reinitialised. */
-    byte src[64];
+    omsx_byte src[64];
     std::memset(src, 0, sizeof(src));
     sBack = saveStateOpenForRead("nukedopll");
     saveStateGetBuffer(sBack, "regs", src, sizeof(src));
@@ -463,7 +463,7 @@ void NukedOpllBackend::loadState()
         if (src[i] != 0) { allZero = 0; break; }
     }
     if (allZero) {
-        byte fromWrap[256];
+        omsx_byte fromWrap[256];
         std::memset(fromWrap, 0, sizeof(fromWrap));
         SaveState* sWrap = saveStateOpenForRead("msxmusic");
         saveStateGetBuffer(sWrap, "regs", fromWrap, sizeof(fromWrap));

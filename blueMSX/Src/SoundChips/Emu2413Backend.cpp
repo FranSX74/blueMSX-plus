@@ -56,7 +56,7 @@ void Emu2413Backend::reset(const EmuTime& /*time*/)
     memset(regCache, 0, sizeof(regCache));
 }
 
-void Emu2413Backend::writeReg(byte r, byte v, const EmuTime& /*time*/)
+void Emu2413Backend::writeReg(omsx_byte r, omsx_byte v, const EmuTime& /*time*/)
 {
     if ((r & 0x3f) < 64) {
         regCache[r & 0x3f] = v;
@@ -64,7 +64,7 @@ void Emu2413Backend::writeReg(byte r, byte v, const EmuTime& /*time*/)
     OPLL_writeReg(opll, r, v);
 }
 
-byte Emu2413Backend::peekReg(byte r)
+omsx_byte Emu2413Backend::peekReg(omsx_byte r)
 {
     return regCache[r & 0x3f];
 }
@@ -264,8 +264,8 @@ void Emu2413Backend::loadState()
 
     /* Fallback: register-replay. Prefer emu2413/regs over msxmusic/regs;
     ** transient state (eg phase, pg phase, LFO) is reinitialised. */
-    byte fromBackend[64];
-    byte fromWrapper[256];
+    omsx_byte fromBackend[64];
+    omsx_byte fromWrapper[256];
     memset(fromBackend, 0, sizeof(fromBackend));
     memset(fromWrapper, 0, sizeof(fromWrapper));
 
@@ -281,7 +281,7 @@ void Emu2413Backend::loadState()
     for (int i = 0; i < 64; i++) {
         if (fromBackend[i] != 0) { allZeroBackend = 0; break; }
     }
-    const byte* src = allZeroBackend ? fromWrapper : fromBackend;
+    const omsx_byte* src = allZeroBackend ? fromWrapper : fromBackend;
 
     OPLL_reset(opll);
     for (int r = 0; r < 64; r++) {

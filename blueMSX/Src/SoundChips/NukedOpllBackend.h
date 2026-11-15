@@ -32,8 +32,8 @@ public:
     virtual ~NukedOpllBackend();
 
     virtual void reset(const EmuTime& time);
-    virtual void writeReg(byte r, byte v, const EmuTime& time);
-    virtual byte peekReg(byte r);
+    virtual void writeReg(omsx_byte r, omsx_byte v, const EmuTime& time);
+    virtual omsx_byte peekReg(omsx_byte r);
 
     virtual void setInternalVolume(short newVolume);
     virtual int* updateBuffer(int length);
@@ -58,7 +58,7 @@ private:
     int32_t frameSumM;
     int32_t frameSumR;
     int     buffer[AUDIO_MONO_BUFFER_SIZE];
-    byte    regCache[64];
+    omsx_byte    regCache[64];
 };
 
 #endif
