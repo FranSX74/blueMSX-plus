@@ -126,6 +126,8 @@ public:
     QMenuBar*     menus() const { return view->menuBar(); }
     ThemeView*    themeView() const { return view; }
     void applyWindowSettings();
+    void fitZoomToScreen();
+    QSize sizeForZoom(int zoom) const;
     void rebuildMenuBar();
     void popupMenu(FrontendMenu menu, int x = -1, int y = -1);
     void updateTitle();

@@ -300,6 +300,15 @@ static ArchBitmap* loadClassicBitmap(int z, int idX2, int frameCount)
     ArchBitmap* scaled;
     int origW, origH, dstW, dstH;
 
+    if (base != NULL && (idX2 == IDB_CLASSIC_FONT || idX2 == IDB_CLASSIC_FONT2) && frameCount > 1) {
+        /* The frontend redraws the status-line font with a real typeface at
+        ** the screen's resolution; a stretched 6-pixel font is hard to read. */
+        ArchBitmap* font = archBitmapCreateGlyphFont(base, frameCount, z);
+        if (font != NULL) {
+            archBitmapDestroy(base);
+            return font;
+        }
+    }
     if (z == 2 || base == NULL) {
         return base;
     }

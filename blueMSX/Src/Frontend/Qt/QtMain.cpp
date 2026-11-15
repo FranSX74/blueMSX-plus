@@ -22,6 +22,8 @@ extern "C" {
 
 #include <QAction>
 #include <QApplication>
+#include <QScreen>
+#include <QGuiApplication>
 #include <QCloseEvent>
 #include <QCursor>
 #include <QLabel>
@@ -247,15 +249,22 @@ void ScreenWidget::keyReleaseEvent(QKeyEvent* e)
 void ScreenWidget::focusInEvent(QFocusEvent*)  { platformKeyboardFocus(1); }
 void ScreenWidget::focusOutEvent(QFocusEvent*) { platformKeyboardFocus(0); }
 
+/* Wayland lets Qt grab the pointer only for popups (and says so on each
+** try); the hidden cursor over the screen is enough there. */
+static bool canGrabMouse()
+{
+    return QGuiApplication::platformName() != "wayland";
+}
+
 void ScreenWidget::setMouseCaptured(bool on)
 {
     captured = on;
     if (on) {
         setCursor(Qt::BlankCursor);
-        grabMouse();
+        if (canGrabMouse()) grabMouse();
     }
     else {
-        releaseMouse();
+        if (canGrabMouse()) releaseMouse();
         unsetCursor();
     }
 }
@@ -312,6 +321,51 @@ static ThemeCollection* selectedTheme()
     return list.empty() ? NULL : list[0];
 }
 
+/* The theme page for a zoom, NULL for a plain window. */
+static ThemePage* pageForZoom(int zoom)
+{
+    ThemeCollection* tc = selectedTheme();
+    if (tc == NULL) return NULL;
+    Theme* theme = zoom < THEME_ZOOM_COUNT ? tc->zoom[zoom] : NULL;
+    if (theme == NULL && zoom != 1) theme = tc->zoom[2];
+    return theme ? themeGetCurrentPage(theme) : NULL;
+}
+
+static int currentZoom()
+{
+    Properties* p = platformGetProperties();
+    int zoom = p != NULL ? p->video.windowSize - P_VIDEO_SIZEX1 + 1 : 2;
+    return qBound(1, zoom, 8);
+}
+
+QSize MainWindow::sizeForZoom(int zoom) const
+{
+    ThemePage* page = pageForZoom(zoom);
+    if (page == NULL) {
+        return QSize(PLATFORM_SCREEN_WIDTH * zoom, PLATFORM_SCREEN_HEIGHT * zoom + view->menuHeight());
+    }
+    return QSize(qMax(page->width, page->emuWinX + PLATFORM_SCREEN_WIDTH * zoom),
+                 qMax(page->height, page->emuWinY + PLATFORM_SCREEN_HEIGHT * zoom));
+}
+
+/* At start-up the window must fit the screen it opens on: a saved 4x does
+** not fit a 1080p screen, so it opens at the largest zoom that does. */
+void MainWindow::fitZoomToScreen()
+{
+    Properties* p = platformGetProperties();
+    if (p == NULL || p->video.windowSize == P_VIDEO_SIZEFULLSCREEN) return;
+    QScreen* s = QWidget::screen() ? QWidget::screen() : QGuiApplication::primaryScreen();
+    if (s == NULL) return;
+    QSize avail = s->availableGeometry().size() - QSize(8, 24);    /* a little room for decorations or a panel */
+    int zoom = currentZoom();
+    while (zoom > 1) {
+        QSize need = sizeForZoom(zoom);
+        if (need.width() <= avail.width() && need.height() <= avail.height()) break;
+        zoom--;
+    }
+    if (zoom != currentZoom()) p->video.windowSize = P_VIDEO_SIZEX1 + zoom - 1;
+}
+
 void MainWindow::applyWindowSettings()
 {
     Properties* p = platformGetProperties();
@@ -328,28 +382,18 @@ void MainWindow::applyWindowSettings()
     }
     menus()->show();
     if (isFullScreen()) showNormal();
-    int zoom = p != NULL ? p->video.windowSize - P_VIDEO_SIZEX1 + 1 : 2;
-    if (zoom < 1) zoom = 1;
-    if (zoom > 8) zoom = 8;
+    int zoom = currentZoom();
 
-    ThemeCollection* tc = selectedTheme();
-    ThemePage* page = NULL;
-    if (tc != NULL) {
-        Theme* theme = zoom < THEME_ZOOM_COUNT ? tc->zoom[zoom] : NULL;
-        if (theme == NULL && zoom != 1) theme = tc->zoom[2];
-        page = theme ? themeGetCurrentPage(theme) : NULL;
-    }
+    ThemePage* page = pageForZoom(zoom);
     view->setPage(page);
     if (page == NULL) {
         view->layoutPlain();
-        resize(PLATFORM_SCREEN_WIDTH * zoom, PLATFORM_SCREEN_HEIGHT * zoom + view->menuHeight());
+        resize(sizeForZoom(zoom));
         return;
     }
     /* The page fixes the window: artwork, menu strip and screen. */
-    QRect emu(page->emuWinX, page->emuWinY, PLATFORM_SCREEN_WIDTH * zoom, PLATFORM_SCREEN_HEIGHT * zoom);
-    view->setScreenRect(emu);
-    QSize size(qMax(page->width, emu.right() + 1), qMax(page->height, emu.bottom() + 1));
-    setFixedSize(size);
+    view->setScreenRect(QRect(page->emuWinX, page->emuWinY, PLATFORM_SCREEN_WIDTH * zoom, PLATFORM_SCREEN_HEIGHT * zoom));
+    setFixedSize(sizeForZoom(zoom));
 }
 
 void MainWindow::closeEvent(QCloseEvent* e)
@@ -514,6 +558,7 @@ int main(int argc, char** argv)
     theWindow = &window;
     DropFilter drops;
     window.installEventFilter(&drops);
+    window.fitZoomToScreen();
     window.applyWindowSettings();
     window.show();
 

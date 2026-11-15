@@ -478,7 +478,7 @@ void langInitSpanish(LanguageStrings* ls)
 
     ls->propSetFileHistoryGB     = "Histórico de Archivos ";
     ls->propSetFileHistorySize   = "Número de items en Histórico de Archivos:";
-    ls->propSetFileHistoryClear  = "Borrar Hostórico";
+    ls->propSetFileHistoryClear  = "Borrar Histórico";
     ls->propFileTypes            = " Registrar .rom/.dsk/.cas/.sta en el menú \"Abrir con\"";
     ls->propOpenDefaultApps      = "Abrir config. de apps predet. de Windows";
     ls->propWindowsEnvGB         = "Ambiente Windows ";

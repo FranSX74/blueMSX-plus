@@ -20,6 +20,7 @@ extern "C" {
 
 #include <QComboBox>
 #include <QDialog>
+#include <QDialogButtonBox>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QInputDialog>
@@ -82,6 +83,11 @@ public:
         }
         table->setContextMenuPolicy(Qt::CustomContextMenu);
         layout->addWidget(table, 1);
+
+        auto* buttons = new QDialogButtonBox(QDialogButtonBox::Close);
+        buttons->button(QDialogButtonBox::Close)->setText(u8(langDlgClose()));
+        connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::close);
+        layout->addWidget(buttons);
 
         connect(profile, &QComboBox::activated, [this]() {
             Properties* p = platformGetProperties();
