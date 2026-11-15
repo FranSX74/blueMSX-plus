@@ -12,6 +12,9 @@
 **     each screen pixel so there is no moire at fractional zooms, with the
 **     brightness compensation and shape presets of the Windows dialog.
 ** Interlaced frames get no scanlines, as on a real set.
+** Then the CRT effects, all off by default: tube curvature with rounded
+** corners, phosphor glow, a phosphor mask (aperture grille, slot or shadow
+** mask, at the screen's own pixels) and vignetting.
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -35,11 +38,10 @@ namespace qbm {
 
 static const char* vertexSource = R"(
 attribute vec2 position;    /* clip space */
-attribute vec2 source;      /* texels of the frame */
-varying vec2 texel;
+varying vec2 screen;        /* -1..1 across the picture, y up */
 void main()
 {
-    texel = source;
+    screen = position;
     gl_Position = vec4(position, 0.0, 1.0);
 }
 )";
@@ -55,7 +57,12 @@ uniform float scanlines;    /* 0 / 1 */
 uniform float scanFloor;    /* brightness between lines, 0..1 */
 uniform float scanShape;    /* sin^p exponent, 0..4 */
 uniform float scanBoost;    /* brightness compensation, >= 1 */
-varying vec2 texel;
+uniform float curvature;    /* 0..0.25 */
+uniform float maskType;     /* P_CRT_MASK_* */
+uniform float maskDark;     /* brightness of the masked-out phosphors, 0..1 */
+uniform float vignette;     /* 0..1 */
+uniform float glow;         /* 0..1 */
+varying vec2 screen;
 
 vec3 fetch(vec2 t)
 {
@@ -69,8 +76,41 @@ float sinIntegral(float t)
     return floor(t) * 0.6366197724 + (1.0 - cos(3.14159265 * fract(t))) * 0.3183098862;
 }
 
+/* The phosphor pattern under screen pixel `p`: each cell a red, green and
+** blue phosphor, with the others dimmed to maskDark. */
+vec3 phosphorMask(vec2 p)
+{
+    vec3 m = vec3(maskDark);
+    if (maskType < 1.5) {               /* aperture grille: vertical stripes */
+        float x = fract(p.x / 3.0);
+        if (x < 0.333) m.r = 1.0; else if (x < 0.666) m.g = 1.0; else m.b = 1.0;
+    }
+    else if (maskType < 2.5) {          /* slot mask: stripes in staggered cells */
+        float cell = floor(p.x / 3.0);
+        float y = p.y + mod(cell, 2.0) * 2.0;
+        float x = fract(p.x / 3.0);
+        if (x < 0.333) m.r = 1.0; else if (x < 0.666) m.g = 1.0; else m.b = 1.0;
+        if (mod(floor(y), 4.0) < 1.0) m *= maskDark + (1.0 - maskDark) * 0.5;
+    }
+    else {                              /* shadow mask: dot triads, shifted each row */
+        float x = fract((p.x + floor(p.y) * 1.5) / 3.0);
+        if (x < 0.333) m.r = 1.0; else if (x < 0.666) m.g = 1.0; else m.b = 1.0;
+    }
+    return m;
+}
+
 void main()
 {
+    /* Barrel distortion of the tube; outside it is the black bezel. */
+    vec2 c = screen;
+    c += c * (c.yx * c.yx) * curvature;
+    vec2 uv = vec2(c.x, -c.y) * 0.5 + 0.5;
+    if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0)))) {
+        gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+        return;
+    }
+    vec2 texel = mix(sourceMin, sourceMax, uv);
+
     vec3 color;
     if (filterMode > 0.5 && filterMode < 2.5) {
         vec2 q    = texel - 0.5;
@@ -103,7 +143,44 @@ void main()
         float mask  = mix(scanFloor, 1.0, shape);
         color *= pow(max(min(mask * scanBoost, 1.0), 0.0), 1.0 / 2.2);
     }
-    gl_FragColor = vec4(color, 1.0);
+
+    if (glow > 0.0) {
+        /* Light spreading in the glass: a wide blur of the picture, added
+        ** with a screen blend so it fills the scanline gaps and haloes
+        ** bright pixels without clipping. */
+        vec3 sum = vec3(0.0);
+        for (int i = 0; i < 12; i++) {
+            float a = float(i) * 0.5235988;
+            vec2 d = vec2(cos(a), sin(a));
+            sum += texture2D(frame, (texel + d * 3.0) / frameSize).rgb;
+            sum += 0.5 * texture2D(frame, (texel + d * 7.0) / frameSize).rgb;
+        }
+        vec3 halo = sum / 18.0;
+        halo *= halo;                   /* mostly the bright parts */
+        color = 1.0 - (1.0 - color) * (1.0 - halo * glow);
+    }
+
+    if (maskType > 0.5) {
+        vec3 m = phosphorMask(gl_FragCoord.xy);
+        /* Lift the average back up a little: a mask costs brightness. */
+        color *= m * mix(1.0, 3.0 / (1.0 + 2.0 * maskDark), 0.6);
+    }
+
+    if (vignette > 0.0) {
+        float v = 16.0 * uv.x * uv.y * (1.0 - uv.x) * (1.0 - uv.y);
+        color *= mix(1.0, pow(v, 0.35), vignette);
+    }
+
+    if (curvature > 0.0) {
+        /* Rounded tube corners, anti-aliased over about a screen pixel. */
+        vec2 e = min(uv, 1.0 - uv) * vec2(1.0, 0.75);
+        float r = 0.03 + curvature * 0.12;
+        vec2 q = max(vec2(r) - e, 0.0);
+        float d = r - length(q);
+        float px = max(fwidth(uv.x), 1e-4);
+        color *= clamp(d / px, 0.0, 1.0);
+    }
+    gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
 }
 )";
 
@@ -121,7 +198,6 @@ void ScreenWidget::initializeGL()
     bool ok = program->addShaderFromSourceCode(QOpenGLShader::Vertex, header + vertexSource) &&
               program->addShaderFromSourceCode(QOpenGLShader::Fragment, header + fragmentSource);
     program->bindAttributeLocation("position", 0);
-    program->bindAttributeLocation("source", 1);
     ok = ok && program->link();
     if (!ok) {
         fprintf(stderr, "qbluemsx: no shader renderer, drawing with QPainter: %s\n",
@@ -198,10 +274,6 @@ bool ScreenWidget::drawWithShader()
     int sx, sy, sxw, syh;
     platformScreenSourceRect(QBM_RENDER_ZOOM, &sx, &sy, &sxw, &syh);
     const GLfloat position[] = { -1, 1,   1, 1,   -1, -1,   1, -1 };
-    const GLfloat source[] = {
-        GLfloat(sx), GLfloat(sy),               GLfloat(sx + sxw), GLfloat(sy),
-        GLfloat(sx), GLfloat(sy + syh),         GLfloat(sx + sxw), GLfloat(sy + syh),
-    };
 
     bool scan = props && props->video.scanlinesEnable && !platformLastFrameInterlaced();
     float boost = 1.0f;
@@ -222,13 +294,16 @@ bool ScreenWidget::drawWithShader()
     program->setUniformValue("scanShape", props ? qBound(0, props->video.scanlinesShapePct, 100) / 25.0f : 2.0f);
     program->setUniformValue("scanBoost", boost);
 
+    program->setUniformValue("curvature", props ? qBound(0, props->video.crtCurvature, 100) / 400.0f : 0.0f);
+    program->setUniformValue("maskType", GLfloat(props ? props->video.crtMask : 0));
+    program->setUniformValue("maskDark", props ? 1.0f - qBound(0, props->video.crtMaskPct, 100) / 100.0f : 1.0f);
+    program->setUniformValue("vignette", props ? qBound(0, props->video.crtVignette, 100) / 100.0f : 0.0f);
+    program->setUniformValue("glow", props ? qBound(0, props->video.crtGlow, 100) / 100.0f : 0.0f);
+
     program->enableAttributeArray(0);
-    program->enableAttributeArray(1);
     program->setAttributeArray(0, GL_FLOAT, position, 2);
-    program->setAttributeArray(1, GL_FLOAT, source, 2);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     program->disableAttributeArray(0);
-    program->disableAttributeArray(1);
     program->release();
     return true;
 }

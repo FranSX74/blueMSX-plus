@@ -295,6 +295,11 @@ typedef struct {
     int scanlinesBrightPct;    /* 100..300, used when scanlinesBrightAuto == 0 */
     int scanlinesShapeMode;    /* 0=Gentle, 1=Standard CRT, 2=Sharp, 3=Trinitron, 4=Custom */
     int scanlinesShapePct;     /* 0..100 -> p in [0, 4]; mask = lerp(s, 1, pow(beam, p)) */
+    int crtCurvature;          /* 0..100 -- tube curvature (GPU renderers) */
+    int crtMask;               /* P_CRT_MASK_* -- phosphor mask */
+    int crtMaskPct;            /* 0..100 -- mask strength */
+    int crtVignette;           /* 0..100 -- darker corners */
+    int crtGlow;               /* 0..100 -- phosphor glow (bloom) */
     int hdrEnable;             /* 0/1 -- request HDR (scRGB FP16) swap chain on DX12 */
     int hdrPaperWhiteNits;     /* 80..400, target SDR-white luminance in HDR mode (default 200) */
     int recordHdr;             /* 0/1 -- record in HDR (HEVC main10 + BT.2020 + PQ); requires hdrEnable */
@@ -319,6 +324,13 @@ enum {
 	P_D3D_RES_AUTO = 0,
 	P_D3D_RES_256,
 	P_D3D_RES_512
+};
+
+enum {
+	P_CRT_MASK_NONE = 0,
+	P_CRT_MASK_APERTURE,       /* aperture grille (Trinitron stripes) */
+	P_CRT_MASK_SLOT,           /* slot mask (staggered cells) */
+	P_CRT_MASK_SHADOW          /* shadow mask (dot triads) */
 };
 
 enum {

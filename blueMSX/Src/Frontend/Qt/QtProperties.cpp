@@ -319,6 +319,27 @@ static void scanlineControls(Page* page, Properties* p)
                  [p]() { return p->video.scanlinesEnable && !p->video.scanlinesBrightAuto; });
 }
 
+/* QblueMSX's own texts, in Spanish or English (the language files have no
+** CRT entries; the Windows version has no such effects). */
+static const char* local(const char* english, const char* spanish)
+{
+    return langGetLanguage() == EMU_LANG_SPANISH ? spanish : english;
+}
+
+/* CRT effects of the shader renderer (QtScreenGL.cpp). */
+static void crtControls(Page* page, Properties* p)
+{
+    page->group("CRT");
+    page->slider(local("Curvature:", "Curvatura:"), &p->video.crtCurvature, 0, 100, 0, pct);
+    page->combo(local("Phosphor mask:", "Máscara:"), &p->video.crtMask,
+                { local("None", "Ninguna"), local("Aperture grille (Trinitron)", "Rejilla de apertura (Trinitron)"),
+                  local("Slot mask", "Máscara de ranuras"), local("Shadow mask", "Máscara de sombra") });
+    page->slider(local("Mask strength:", "Intensidad máscara:"), &p->video.crtMaskPct, 0, 100, 30, pct,
+                 [p]() { return p->video.crtMask != P_CRT_MASK_NONE; });
+    page->slider(local("Glow:", "Resplandor:"), &p->video.crtGlow, 0, 100, 0, pct);
+    page->slider(local("Vignette:", "Viñeteado:"), &p->video.crtVignette, 0, 100, 0, pct);
+}
+
 static QWidget* pageVideo(std::vector<std::function<void()>>* syncs)
 {
     Properties* p = platformGetProperties();
@@ -346,6 +367,8 @@ static QWidget* pageVideo(std::vector<std::function<void()>>* syncs)
     page->check(langPropMonColorGhosting(), &p->video.colorSaturationEnable);
     page->slider("", &p->video.colorSaturationWidth, 0, 4, -1, num,
                  [p]() { return p->video.colorSaturationEnable != 0; });
+
+    crtControls(page, p);
 
     page->group(langPropVideo());
     page->combo(langPropD3DScalingFilterText(), &p->video.d3d.scalingFilter,
