@@ -22,6 +22,7 @@ extern "C" {
 
 #include <QAction>
 #include <QApplication>
+#include <QStandardPaths>
 #include <QScreen>
 #include <QGuiApplication>
 #include <QCloseEvent>
@@ -527,8 +528,12 @@ int main(int argc, char** argv)
 {
     QApplication::setApplicationName("QblueMSX");
     QApplication::setOrganizationName("bluemsx");
-    QApplication::setDesktopFileName("org.bluemsx.qbluemsx");
     QApplication app(argc, argv);
+    /* Name the desktop entry only once it is installed: the portal
+    ** complains about an app ID it cannot find. */
+    if (!QStandardPaths::locate(QStandardPaths::ApplicationsLocation, "org.bluemsx.qbluemsx.desktop").isEmpty()) {
+        QApplication::setDesktopFileName("org.bluemsx.qbluemsx");
+    }
 
     FrontendHooks hooks = {};
     hooks.displayUpdate  = hookDisplayUpdate;
