@@ -571,7 +571,7 @@ int main(int argc, char** argv)
     FrontendHooks hooks;
     int rc;
 
-    SDL_SetAppMetadata("blueMSX+", NULL, "org.bluemsx.plus");
+    SDL_SetAppMetadata("blueMSX-ImGui", NULL, "org.bluemsx.imgui");
     SDL_SetHint(SDL_HINT_IME_IMPLEMENTED_UI, "1");
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
         fprintf(stderr, "blueMSX+: SDL_Init failed: %s\n", SDL_GetError());
@@ -579,7 +579,7 @@ int main(int argc, char** argv)
     }
     userEvent = SDL_RegisterEvents(1);
 
-    if (!SDL_CreateWindowAndRenderer("blueMSX+", TEX_WIDTH, TEX_HEIGHT + 24,
+    if (!SDL_CreateWindowAndRenderer("blueMSX-ImGui", TEX_WIDTH, TEX_HEIGHT + 24,
                                      SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY |
                                      SDL_WINDOW_HIDDEN, &window, &renderer)) {
         fprintf(stderr, "blueMSX+: cannot open a window: %s\n", SDL_GetError());
@@ -649,7 +649,7 @@ int main(int argc, char** argv)
         while (SDL_PollEvent(&ev)) {
             if (ev.type == userEvent && ev.user.code == EV_MESSAGE) {
                 if ((intptr_t)ev.user.data2 == FRONTEND_MESSAGE_ERROR) {
-                    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "blueMSX+",
+                    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "blueMSX-ImGui",
                                              (const char*)ev.user.data1, NULL);
                 }
                 SDL_free(ev.user.data1);

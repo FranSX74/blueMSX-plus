@@ -2,14 +2,14 @@
 #
 #   cmake -B build -DCMAKE_BUILD_TYPE=Release
 #   cmake --build build -j
-#   ./build/bin/bluemsx-plus-sdl
+#   ./build/bin/bluemsx-sdl
 #
 # Layout:
 #   bluemsx-core      the emulator (Src/* except the Windows UI); its file list
 #                     is read from the Visual Studio project, so both builds
 #                     stay in step.
 #   bluemsx-platform  arch* implementation on SDL3 + POSIX (Src/Platform).
-#   frontends         bluemsx-plus-imgui (Dear ImGui), bluemsx-plus-sdl
+#   frontends         bluemsx-imgui (Dear ImGui), bluemsx-sdl
 #                     (minimal); Qt6 comes next.
 #
 # Windows keeps building with Make/msvc20xx/blueMSX.sln.
@@ -19,8 +19,8 @@ project(bluemsx-plus VERSION 3.1.1 LANGUAGES C CXX)
 
 include(GNUInstallDirs)
 
-option(BLUEMSX_FRONTEND_IMGUI "Build the Dear ImGui frontend (bluemsx-plus-imgui)" ON)
-option(BLUEMSX_FRONTEND_SDL "Build the minimal SDL3 frontend (bluemsx-plus-sdl)" ON)
+option(BLUEMSX_FRONTEND_IMGUI "Build the Dear ImGui frontend (bluemsx-imgui)" ON)
+option(BLUEMSX_FRONTEND_SDL "Build the minimal SDL3 frontend (bluemsx-sdl)" ON)
 option(BLUEMSX_SANITIZE "Build with AddressSanitizer and UBSan" OFF)
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -132,7 +132,7 @@ function(bluemsx_frontend target)
 endfunction()
 
 if(BLUEMSX_FRONTEND_SDL)
-    bluemsx_frontend(bluemsx-plus-sdl ${BMX}/Src/Frontend/Sdl/SdlMain.c)
+    bluemsx_frontend(bluemsx-sdl ${BMX}/Src/Frontend/Sdl/SdlMain.c)
 endif()
 
 if(BLUEMSX_FRONTEND_IMGUI)
@@ -146,10 +146,10 @@ if(BLUEMSX_FRONTEND_IMGUI)
     target_link_libraries(imgui PUBLIC SDL3::SDL3)
 
     set(BMX_IMGUI ${BMX}/Src/Frontend/ImGui)
-    bluemsx_frontend(bluemsx-plus-imgui
+    bluemsx_frontend(bluemsx-imgui
         ${BMX_IMGUI}/ImGuiMain.cpp ${BMX_IMGUI}/ImGuiMenus.cpp ${BMX_IMGUI}/ImGuiDialogs.cpp
         ${BMX_IMGUI}/ImGuiFileDialog.cpp ${BMX_IMGUI}/ImGuiProperties.cpp ${BMX_IMGUI}/ImGuiShortcuts.cpp)
-    target_link_libraries(bluemsx-plus-imgui PRIVATE imgui)
+    target_link_libraries(bluemsx-imgui PRIVATE imgui)
 endif()
 
 # ---- Data -------------------------------------------------------------------

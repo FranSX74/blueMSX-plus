@@ -149,21 +149,23 @@ When multiple backends are enabled, **emulation runs in all enabled backends sim
 
 ### Linux (work in progress)
 
+This branch is the Unix port: the blueMSX+ emulator with its own frontends, **blueMSX-ImGui** (`bluemsx-imgui`, Dear ImGui, portable) and **QblueMSX** (`qbluemsx`, Qt6, in progress). It is based on [blueMSX+](https://github.com/Hesoten/blueMSX-plus) by Hesoten, itself based on blueMSX by Daniel Vik, and like them is licensed under GPLv2.
+
 Needs CMake, Ninja, a C/C++20 compiler and SDL3.
 
 ```
 cmake -B build -G Ninja
 cmake --build build
-./build/bin/bluemsx-plus-imgui game.rom
-./build/bin/bluemsx-plus-imgui /machine "MSX2+ - C-BIOS" /rom1 game.rom
+./build/bin/bluemsx-imgui game.rom
+./build/bin/bluemsx-imgui /machine "MSX2+ - C-BIOS" /rom1 game.rom
 ```
 
-Two executables share the same emulator and settings:
+The executables share the same emulator and settings:
 
-- `bluemsx-plus-imgui` (Dear ImGui): the blueMSX menus (File, Emulation, Window, Options, Tools, Help) with file history, special cartridges and zip contents; a built-in file browser (or the desktop's own through "System dialog..."); Properties, Shortcut editor, Audio mixer and Language windows. The menu bar hides itself in fullscreen.
-- `bluemsx-plus-sdl`: a bare window without menus, driven by the keyboard shortcuts alone.
+- `bluemsx-imgui` (Dear ImGui): the blueMSX menus (File, Emulation, Window, Options, Tools, Help) with file history, special cartridges and zip contents; a built-in file browser (or the desktop's own through "System dialog..."); Properties, Shortcut editor, Audio mixer and Language windows. The menu bar hides itself in fullscreen.
+- `bluemsx-sdl`: a bare window without menus, driven by the keyboard shortcuts alone.
 
-Both use the blueMSX shortcut profiles (`Shortcut Profiles/*.ini`, same format as on Windows, created from the shipped defaults on first run) and the first two gamepads as MSX joysticks 1 and 2 (d-pad or left stick, A/X button 1, B/Y button 2). Media files can be dropped on the window. A Qt6 frontend with the classic look is planned.
+Both use the blueMSX shortcut profiles (`Shortcut Profiles/*.ini`, same format as on Windows, created from the shipped defaults on first run) and the first two gamepads as MSX joysticks 1 and 2 (d-pad or left stick, A/X button 1, B/Y button 2). Media files can be dropped on the window. QblueMSX, the Qt6 frontend with the classic blueMSX look, is in progress.
 
 On Linux an absolute path also starts with `/`: an argument is read as an option only when it has no other `/` and names no existing file, so `/rom1 /home/me/game.rom` works as expected.
 

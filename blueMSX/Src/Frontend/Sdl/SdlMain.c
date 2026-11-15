@@ -3,7 +3,7 @@
 **
 ** A window showing the emulated screen, with no menus: the keyboard
 ** shortcuts of the active profile work, and media files can be dropped on
-** the window. bluemsx-plus-imgui is the full frontend.
+** the window. bluemsx-imgui is the full frontend.
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -252,7 +252,7 @@ static void handleEvent(const SDL_Event* ev)
                 SDL_SetWindowRelativeMouseMode(window, ev->user.data2 != NULL);
                 break;
             case EV_MESSAGE:
-                SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "blueMSX+",
+                SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "blueMSX-SDL",
                                          (const char*)ev->user.data1, window);
                 SDL_free(ev->user.data1);
                 break;
@@ -267,14 +267,14 @@ int main(int argc, char** argv)
     FrontendHooks hooks;
     int rc;
 
-    SDL_SetAppMetadata("blueMSX+", NULL, "org.bluemsx.plus");
+    SDL_SetAppMetadata("blueMSX-SDL", NULL, "org.bluemsx.sdl");
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
         fprintf(stderr, "blueMSX+: SDL_Init failed: %s\n", SDL_GetError());
         return 1;
     }
     userEvent = SDL_RegisterEvents(1);
 
-    if (!SDL_CreateWindowAndRenderer("blueMSX+", TEX_WIDTH, TEX_HEIGHT,
+    if (!SDL_CreateWindowAndRenderer("blueMSX-SDL", TEX_WIDTH, TEX_HEIGHT,
                                      SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY,
                                      &window, &renderer)) {
         fprintf(stderr, "blueMSX+: cannot open a window: %s\n", SDL_GetError());
