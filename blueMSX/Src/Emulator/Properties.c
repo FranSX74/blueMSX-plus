@@ -1520,26 +1520,29 @@ Properties* propCreate(int useDefault, int langType, PropKeyboardLanguage kbdLan
 
         if (!foundMachine)
         {
+            /* MSX2 needs its own ROM dumps; the C-BIOS machines ship with
+            ** blueMSX and always run, so they come next. Only then the first
+            ** machine available, which may not even be an MSX. */
+            static const char* preferred[] = { "MSX2", "MSX2+ - C-BIOS", "MSX2 - C-BIOS", "MSX - C-BIOS", NULL };
+            int k;
+
             if (arrayListGetSize(machineList) > 0)
                 strcpy(properties->emulation.machineName, (char *)arrayListGetObject(machineList, 0));
-            
-            iterator = arrayListCreateIterator(machineList);
-            while (arrayListCanIterate(iterator))
-            {
-                char *machineName = (char *)arrayListIterate(iterator);
-                if (strcmp(machineName, "MSX2") == 0)
+
+            for (k = 0; preferred[k] != NULL && !foundMachine; k++) {
+                iterator = arrayListCreateIterator(machineList);
+                while (arrayListCanIterate(iterator))
                 {
-                    strcpy(properties->emulation.machineName, machineName);
-                    foundMachine = 1;
+                    char *machineName = (char *)arrayListIterate(iterator);
+                    if (strcmp(machineName, preferred[k]) == 0)
+                    {
+                        strcpy(properties->emulation.machineName, machineName);
+                        foundMachine = 1;
+                        break;
+                    }
                 }
-                
-                if (!foundMachine && strncmp(machineName, "MSX2", 4))
-                {
-                    strcpy(properties->emulation.machineName, machineName);
-                    foundMachine = 1;
-                }
+                arrayListDestroyIterator(iterator);
             }
-            arrayListDestroyIterator(iterator);
         }
         
         arrayListDestroy(machineList);
