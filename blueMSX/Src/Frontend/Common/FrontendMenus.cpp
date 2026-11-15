@@ -15,6 +15,7 @@ extern "C" {
 #include "Platform.h"
 #include "PlatformShortcuts.h"
 #include "Actions.h"
+#include "ArchNotifications.h"
 #include "AudioMixer.h"
 #include "Board.h"
 #include "Casette.h"
@@ -499,6 +500,15 @@ static void menuFile(MenuBuilder& b)
     bool logSound = mixerIsLogging(platformGetMixer()) != 0;
     b.item(logSound ? langMenuFileStopAudio() : langMenuFileCaptureAudio(), SC_WAV_CAPTURE, true,
            logSound ? 1 : NO_CHECK, []() { actionToggleWaveCapture(); });
+    if (platformRecorderAvailable()) {
+        if (archRecordVideoIsActive()) {
+            b.item(langMenuFileStopRecordVideo(), SC_RECORD_VIDEO_STOP, true, 1,
+                   []() { actionRecordVideoStop(); });
+        }
+        else {
+            item(b, langMenuFileRecordVideo(), SC_RECORD_VIDEO_START, []() { actionRecordVideoStart(); });
+        }
+    }
     item(b, langMenuFileScreenShot(), SC_SCREEN_CAPTURE, []() { actionScreenCapture(); });
     sub(b, langMenuFileCaptureVideo(), [&]() { menuVideoCapture(b); });
     b.separator();

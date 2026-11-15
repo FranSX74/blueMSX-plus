@@ -127,6 +127,7 @@ add_library(bluemsx-platform OBJECT
     ${BMX}/Src/Platform/Platform.c
     ${BMX}/Src/Platform/PlatformInput.c
     ${BMX}/Src/Platform/PlatformPaths.c
+    ${BMX}/Src/Platform/PlatformRecorder.cpp
     ${BMX}/Src/Platform/PlatformShortcuts.c
     ${BMX}/Src/Platform/PlatformSound.c
     ${BMX}/Src/Platform/PlatformStubs.c
@@ -137,6 +138,23 @@ target_compile_definitions(bluemsx-platform PRIVATE BLUEMSX_INSTALL_DATADIR="${B
 target_compile_options(bluemsx-platform PRIVATE -Wall -Wno-unused-parameter -Wno-missing-braces)
 target_link_libraries(bluemsx-platform PUBLIC bluemsx-core SDL3::SDL3 Threads::Threads)
 find_package(Threads REQUIRED)
+
+# Video recording (File > Record video) with the FFmpeg libraries; without
+# them the build simply has no recording.
+option(BLUEMSX_FFMPEG "Record video with the FFmpeg libraries" ON)
+if(BLUEMSX_FFMPEG)
+    find_package(PkgConfig)
+    if(PkgConfig_FOUND)
+        pkg_check_modules(FFMPEG IMPORTED_TARGET libavcodec libavformat libavutil libswscale libswresample)
+    endif()
+endif()
+if(FFMPEG_FOUND)
+    message(STATUS "Video recording: FFmpeg ${FFMPEG_libavcodec_VERSION}")
+    target_compile_definitions(bluemsx-platform PRIVATE BLUEMSX_HAVE_FFMPEG)
+    target_link_libraries(bluemsx-platform PUBLIC PkgConfig::FFMPEG)
+else()
+    message(STATUS "Video recording: off (FFmpeg libraries not found)")
+endif()
 
 # A frontend executable: its own sources + the platform objects + the core.
 function(bluemsx_frontend target)

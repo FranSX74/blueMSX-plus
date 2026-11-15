@@ -24,6 +24,7 @@ extern "C" {
 
 class QKeyEvent;
 class QOpenGLShaderProgram;
+class QOpenGLFramebufferObject;
 class QLabel;
 class QMenu;
 class QMenuBar;
@@ -73,11 +74,16 @@ private:
     ** at the output resolution); QPainter when that is not available. */
     bool drawWithShader();
     void drawWithPainter();
+    void uploadTexture();
+    void drawPicture();
+    void recordShaderFrame();
 
     QImage frame;
     bool   frameDirty = true;
     QOpenGLShaderProgram* program = nullptr;
     unsigned texture = 0;
+    QOpenGLFramebufferObject* recordTarget = nullptr;
+    std::vector<unsigned char> recordPixels;
     QRect  screenArea;
     QPoint lastMouse;
     bool   captured = false;

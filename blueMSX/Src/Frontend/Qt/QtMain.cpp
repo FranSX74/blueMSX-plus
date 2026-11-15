@@ -204,6 +204,7 @@ void ScreenWidget::uploadFrame()
         px[i] |= 0xff000000u;
     }
     frameDirty = true;
+    recordShaderFrame();
     update();
 }
 

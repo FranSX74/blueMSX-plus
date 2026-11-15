@@ -80,9 +80,6 @@ void* archScreenCapture(ScreenCaptureType type, int* bitmapSize, int onlyBmp) { 
 void  archScreenCaptureAs(void) {}
 int   archScreenCaptureToFile(ScreenCaptureType type, const char* fname) { return 0; }
 void  archVideoCaptureSave(void) {}
-void  archRecordVideoStart(const char* overrideFilename) {}
-void  archRecordVideoStop(void) {}
-int   archRecordVideoIsActive(void) { return 0; }
 
 /* Debug hook */
 void archTrap(UInt8 value) {}

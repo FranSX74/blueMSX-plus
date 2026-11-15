@@ -25,6 +25,7 @@
 #include "QtApp.h"
 
 #include <QOpenGLContext>
+#include <QOpenGLFramebufferObject>
 #include <QOpenGLShaderProgram>
 #include <QPainter>
 
@@ -215,6 +216,7 @@ void ScreenWidget::initializeGL()
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, frame.width(), frame.height(), 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
     frameDirty = true;
     platformSetGpuScanlines(1);
+    platformRecorderSetPostRender(1);   /* recordings get the shaded picture */
 }
 
 void ScreenWidget::paintGL()
@@ -243,6 +245,45 @@ void ScreenWidget::drawWithPainter()
 bool ScreenWidget::drawWithShader()
 {
     if (program == nullptr) return false;
+    uploadTexture();
+
+    qreal dpr = devicePixelRatioF();
+    glViewport(0, 0, qRound(width() * dpr), qRound(height() * dpr));
+    glClearColor(0, 0, 0, 1);
+    glClear(GL_COLOR_BUFFER_BIT);
+    glViewport(qRound(screenArea.x() * dpr), qRound((height() - screenArea.bottom() - 1) * dpr),
+               qRound(screenArea.width() * dpr), qRound(screenArea.height() * dpr));
+    drawPicture();
+    return true;
+}
+
+/* While recording: the frame through the shader at the recording size, read
+** back for the encoder. Runs once per emulated frame, window shown or not. */
+void ScreenWidget::recordShaderFrame()
+{
+    const int w = 1280, h = 960;
+    if (program == nullptr || !platformRecorderActive()) return;
+    makeCurrent();
+    if (recordTarget == nullptr) {
+        recordTarget = new QOpenGLFramebufferObject(w, h);
+    }
+    uploadTexture();
+    recordTarget->bind();
+    glViewport(0, 0, w, h);
+    glClearColor(0, 0, 0, 1);
+    glClear(GL_COLOR_BUFFER_BIT);
+    drawPicture();
+    recordPixels.resize(size_t(w) * h * 4);
+    glPixelStorei(GL_PACK_ALIGNMENT, 4);
+    glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, recordPixels.data());
+    recordTarget->release();
+    doneCurrent();
+    /* GL rows run bottom-up: start at the top row with a negative pitch. */
+    platformRecorderAddFrame(recordPixels.data() + size_t(h - 1) * w * 4, w, h, -w * 4, PLATFORM_PIXELS_RGBA);
+}
+
+void ScreenWidget::uploadTexture()
+{
     const Properties* props = platformGetProperties();
     int filter = props ? props->video.d3d.scalingFilter : P_D3D_SCALE_SHARP;
 
@@ -263,14 +304,13 @@ bool ScreenWidget::drawWithShader()
     GLint texFilter = filter == P_D3D_SCALE_BILINEAR ? GL_LINEAR : GL_NEAREST;
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, texFilter);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, texFilter);
+}
 
-    qreal dpr = devicePixelRatioF();
-    glViewport(0, 0, qRound(width() * dpr), qRound(height() * dpr));
-    glClearColor(0, 0, 0, 1);
-    glClear(GL_COLOR_BUFFER_BIT);
-    glViewport(qRound(screenArea.x() * dpr), qRound((height() - screenArea.bottom() - 1) * dpr),
-               qRound(screenArea.width() * dpr), qRound(screenArea.height() * dpr));
-
+/* The picture into the current viewport. */
+void ScreenWidget::drawPicture()
+{
+    const Properties* props = platformGetProperties();
+    int filter = props ? props->video.d3d.scalingFilter : P_D3D_SCALE_SHARP;
     int sx, sy, sxw, syh;
     platformScreenSourceRect(QBM_RENDER_ZOOM, &sx, &sy, &sxw, &syh);
     const GLfloat position[] = { -1, 1,   1, 1,   -1, -1,   1, -1 };
@@ -305,7 +345,6 @@ bool ScreenWidget::drawWithShader()
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     program->disableAttributeArray(0);
     program->release();
-    return true;
 }
 
 }

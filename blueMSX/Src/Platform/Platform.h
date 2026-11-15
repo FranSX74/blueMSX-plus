@@ -69,6 +69,24 @@ int  platformLastFrameInterlaced(void);
 ** them out. */
 void platformSetGpuScanlines(int on);
 
+/* ---- Video recording (PlatformRecorder.cpp, FFmpeg) ---------------------- */
+
+#define PLATFORM_PIXELS_BGRA 0      /* B, G, R, X bytes (XRGB8888 little endian) */
+#define PLATFORM_PIXELS_RGBA 1
+
+/* 1 when the build can record video (FFmpeg). */
+int  platformRecorderAvailable(void);
+/* 1 while File > Record video is on. */
+int  platformRecorderActive(void);
+/* A frontend that shows the frame through a shader passes the processed
+** picture itself with platformRecorderAddFrame (on); otherwise the software
+** frame is recorded as it is rendered. */
+void platformRecorderSetPostRender(int on);
+int  platformRecorderPostRender(void);
+/* Records the frame being shown (UI thread). `pitch` may be negative for a
+** bottom-up image (pass the address of the top row). */
+void platformRecorderAddFrame(const void* pixels, int width, int height, int pitch, int format);
+
 /* Tells the emulator the frame requested by displayUpdate was presented. */
 void platformDisplayDone(void);
 

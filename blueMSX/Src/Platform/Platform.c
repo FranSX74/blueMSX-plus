@@ -432,6 +432,7 @@ void platformShutdown(void)
     if (properties == NULL) {
         return;
     }
+    archRecordVideoStop();      /* finish the MP4 before the mixer goes */
     emulatorStop();
     emulatorExit();
 
@@ -477,8 +478,13 @@ int platformRenderFrame(void* dst, int pitch, int zoom)
     lastMaxWidth = frameBuffer->maxWidth;
     lastInterlaced = frameBuffer->interlace != INTERLACE_NONE || frameBuffer->interlaceRaster;
     borderWidth = (PLATFORM_SCREEN_WIDTH - frameBuffer->maxWidth) / 2;
-    return videoRender(video, frameBuffer, 32, zoom, dst,
+    zoom = videoRender(video, frameBuffer, 32, zoom, dst,
                        borderWidth > 0 ? borderWidth * 4 : 0, pitch, -1);
+    if (platformRecorderActive() && !platformRecorderPostRender()) {
+        platformRecorderAddFrame(dst, PLATFORM_SCREEN_WIDTH * zoom, PLATFORM_SCREEN_HEIGHT * zoom,
+                                 pitch, PLATFORM_PIXELS_BGRA);
+    }
+    return zoom;
 }
 
 void platformScreenSourceRect(int zoom, int* x, int* y, int* w, int* h)
