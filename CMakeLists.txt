@@ -2,15 +2,15 @@
 #
 #   cmake -B build -DCMAKE_BUILD_TYPE=Release
 #   cmake --build build -j
-#   ./build/bin/bluemsx-sdl
+#   ./build/bin/qbluemsx   (or bluemsx-imgui, bluemsx-sdl)
 #
 # Layout:
 #   bluemsx-core      the emulator (Src/* except the Windows UI); its file list
 #                     is read from the Visual Studio project, so both builds
 #                     stay in step.
 #   bluemsx-platform  arch* implementation on SDL3 + POSIX (Src/Platform).
-#   frontends         bluemsx-imgui (Dear ImGui), bluemsx-sdl
-#                     (minimal); Qt6 comes next.
+#   frontends         qbluemsx (QblueMSX, Qt6), bluemsx-imgui (blueMSX-ImGui),
+#                     bluemsx-sdl (minimal).
 #
 # Windows keeps building with Make/msvc20xx/blueMSX.sln.
 
@@ -21,6 +21,7 @@ include(GNUInstallDirs)
 
 option(BLUEMSX_FRONTEND_IMGUI "Build the Dear ImGui frontend (bluemsx-imgui)" ON)
 option(BLUEMSX_FRONTEND_SDL "Build the minimal SDL3 frontend (bluemsx-sdl)" ON)
+option(BLUEMSX_FRONTEND_QT "Build the Qt6 frontend (qbluemsx)" ON)
 option(BLUEMSX_SANITIZE "Build with AddressSanitizer and UBSan" OFF)
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -154,6 +155,18 @@ if(BLUEMSX_FRONTEND_IMGUI)
         ${BMX_IMGUI}/ImGuiMain.cpp ${BMX_IMGUI}/ImGuiMenus.cpp ${BMX_IMGUI}/ImGuiDialogs.cpp
         ${BMX_IMGUI}/ImGuiFileDialog.cpp ${BMX_IMGUI}/ImGuiProperties.cpp ${BMX_IMGUI}/ImGuiShortcuts.cpp)
     target_link_libraries(bluemsx-imgui PRIVATE imgui)
+endif()
+
+if(BLUEMSX_FRONTEND_QT)
+    find_package(Qt6 REQUIRED COMPONENTS Widgets OpenGLWidgets)
+    set(BMX_QT ${BMX}/Src/Frontend/Qt)
+    bluemsx_frontend(qbluemsx ${BMX_FRONTEND_COMMON}
+        ${BMX_QT}/QtApp.h ${BMX_QT}/QtMain.cpp ${BMX_QT}/QtKeymap.cpp ${BMX_QT}/QtDialogs.cpp
+        ${BMX_QT}/QtTest.cpp)
+    set_target_properties(qbluemsx PROPERTIES AUTOMOC ON)
+    # The core has a field named "slots": keep Qt keywords as Q_SLOTS, Q_EMIT...
+    target_compile_definitions(qbluemsx PRIVATE QT_NO_KEYWORDS)
+    target_link_libraries(qbluemsx PRIVATE Qt6::Widgets Qt6::OpenGLWidgets)
 endif()
 
 # ---- Data -------------------------------------------------------------------
