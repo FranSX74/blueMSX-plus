@@ -55,7 +55,11 @@ void archShowMenuOptions(int x, int y)      { showMenu(FRONTEND_MENU_OPTIONS, x,
 void archShowMenuTools(int x, int y)        { showMenu(FRONTEND_MENU_TOOLS, x, y); }
 void archShowMenuJoyPort1(int x, int y)     { showMenu(FRONTEND_MENU_JOYPORT1, x, y); }
 void archShowMenuJoyPort2(int x, int y)     { showMenu(FRONTEND_MENU_JOYPORT2, x, y); }
-int  archMenuStripHeight(void)              { return 0; }
+int  archMenuStripHeight(void)
+{
+    const FrontendHooks* h = platformHooks();
+    return h->menuStripHeight ? h->menuStripHeight() : 0;
+}
 void archSetDpiOverride(unsigned int dpi)   {}
 
 /* ---- Dialogs and window --------------------------------------------------- */

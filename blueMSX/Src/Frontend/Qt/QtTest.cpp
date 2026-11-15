@@ -12,6 +12,7 @@
 **   text STR       type text into the focused Qt widget
 **   click X Y      left click at X,Y of the active window (logical pixels)
 **   snap FILE      save the active window (dialog, popup or main) as an image
+**   snapgl FILE    save what the emulated screen widget shows
 **   quit
 **
 ** This program is free software; you can redistribute it and/or modify
@@ -62,7 +63,7 @@ static QAction* findAction(const QList<QAction*>& actions, const QString& title)
 static void triggerMenuPath(const QString& path)
 {
     QStringList parts = path.split('/');
-    QList<QAction*> actions = mainWindow()->menuBar()->actions();
+    QList<QAction*> actions = mainWindow()->menus()->actions();
     for (int i = 0; i < parts.size(); i++) {
         QAction* a = findAction(actions, parts[i]);
         if (a == NULL) {
@@ -144,6 +145,9 @@ static void run(const Step& st)
         if (!w->grab().save(st.arg)) {
             fprintf(stderr, "test: cannot save %s\n", st.arg.toUtf8().constData());
         }
+    }
+    else if (st.cmd == "snapgl") {
+        mainWindow()->screen()->grabFramebuffer().save(st.arg);
     }
     else if (st.cmd == "quit") {
         QApplication::closeAllWindows();

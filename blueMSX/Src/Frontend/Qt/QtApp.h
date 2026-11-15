@@ -19,11 +19,15 @@ extern "C" {
 #include <QMainWindow>
 #include <QOpenGLWidget>
 #include <functional>
+#include <vector>
 
 class QKeyEvent;
 class QLabel;
 class QMenu;
+class QMenuBar;
 class QTimer;
+struct ThemePage;
+struct ThemeCollection;
 
 namespace qbm {
 
@@ -70,6 +74,47 @@ private:
     QTimer* noticeTimer;
 };
 
+/* ---- Skinned window body (QtTheme.cpp) ------------------------------------------ */
+
+/* The client area: the theme page artwork, with the menu bar and the
+** emulated screen placed where the page wants them. Without a page it is a
+** plain menu bar over the screen. */
+class ThemeView : public QWidget {
+    Q_OBJECT
+public:
+    explicit ThemeView(QWidget* parent = nullptr);
+
+    QMenuBar*     menuBar() const { return bar; }
+    ScreenWidget* screen() const { return screenWidget; }
+    ThemePage*    currentPage() const { return page; }
+    int  menuHeight() const;
+    void setPage(ThemePage* page);      /* NULL: plain layout */
+    void setScreenRect(const QRect& r);
+    void setActive(bool active);
+    void layoutPlain();
+
+protected:
+    void paintEvent(QPaintEvent* e) override;
+    void resizeEvent(QResizeEvent* e) override;
+    void mouseMoveEvent(QMouseEvent* e) override;
+    void mousePressEvent(QMouseEvent* e) override;
+    void mouseReleaseEvent(QMouseEvent* e) override;
+
+private:
+    void refresh();
+    void paintTheme(const std::function<void(QPainter*)>& fn);
+
+    ThemePage*    page = nullptr;
+    QImage        canvas;
+    QMenuBar*     bar;
+    ScreenWidget* screenWidget;
+    QTimer*       timer;
+    bool          painting = false;
+};
+
+/* Classic, Classic Dark (built in); "Qt" in settings.themeName means no skin. */
+std::vector<ThemeCollection*>& themeList();
+
 /* ---- Main window -------------------------------------------------------------- */
 
 class MainWindow : public QMainWindow {
@@ -77,10 +122,12 @@ class MainWindow : public QMainWindow {
 public:
     MainWindow();
 
-    ScreenWidget* screen() const { return screenWidget; }
+    ScreenWidget* screen() const { return view->screen(); }
+    QMenuBar*     menus() const { return view->menuBar(); }
+    ThemeView*    themeView() const { return view; }
     void applyWindowSettings();
     void rebuildMenuBar();
-    void popupMenu(FrontendMenu menu);
+    void popupMenu(FrontendMenu menu, int x = -1, int y = -1);
     void updateTitle();
 
 protected:
@@ -88,7 +135,7 @@ protected:
     void changeEvent(QEvent* e) override;
 
 private:
-    ScreenWidget* screenWidget;
+    ThemeView* view;
 };
 
 MainWindow* mainWindow();

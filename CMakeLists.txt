@@ -57,6 +57,9 @@ foreach(_line IN LISTS _lines)
     string(REGEX REPLACE "^\\.\\./\\.\\./" "" _src "${_src}")
     # The Windows user interface, its skin engine and Windows-only devices.
     if(_src MATCHES "^Src/(Win32|Theme)/" OR _src MATCHES "(msxgr\\.cpp|iowin32\\.c)$")
+        if(_src MATCHES "^Src/Theme/")
+            list(APPEND BMX_THEME_SOURCES ${BMX}/${_src})
+        endif()
         continue()
     endif()
     if(NOT EXISTS ${BMX}/${_src})
@@ -106,6 +109,16 @@ target_compile_options(bluemsx-core PRIVATE -w
     $<$<COMPILE_LANG_AND_ID:C,Clang>:-Wno-incompatible-pointer-types -Wno-int-conversion -Wno-implicit-function-declaration>
     $<$<COMPILE_LANGUAGE:CXX>:-fpermissive>)
 target_link_libraries(bluemsx-core PUBLIC m)
+
+# The skin engine, for the frontends that draw the classic blueMSX window (the
+# bitmap and text primitives it calls are theirs to implement).
+list(REMOVE_DUPLICATES BMX_THEME_SOURCES)
+add_library(bluemsx-theme STATIC ${BMX_THEME_SOURCES} ${BMX}/Src/Frontend/Common/ThemeClassic.c)
+target_include_directories(bluemsx-theme PUBLIC ${BMX}/Src/Frontend/Common ${BMX}/Src/Platform ${BMX}/Src/Platform/compat)
+target_link_libraries(bluemsx-theme PUBLIC bluemsx-core)
+target_compile_options(bluemsx-theme PRIVATE -w
+    $<$<COMPILE_LANG_AND_ID:C,GNU>:-fpermissive>
+    $<$<COMPILE_LANGUAGE:CXX>:-fpermissive>)
 
 # ---- Platform layer ----------------------------------------------------------
 
@@ -162,20 +175,26 @@ if(BLUEMSX_FRONTEND_QT)
     set(BMX_QT ${BMX}/Src/Frontend/Qt)
     bluemsx_frontend(qbluemsx ${BMX_FRONTEND_COMMON}
         ${BMX_QT}/QtApp.h ${BMX_QT}/QtMain.cpp ${BMX_QT}/QtKeymap.cpp ${BMX_QT}/QtDialogs.cpp
-        ${BMX_QT}/QtTest.cpp)
+        ${BMX_QT}/QtTest.cpp ${BMX_QT}/QtTheme.cpp)
     set_target_properties(qbluemsx PROPERTIES AUTOMOC ON)
     # The core has a field named "slots": keep Qt keywords as Q_SLOTS, Q_EMIT...
     target_compile_definitions(qbluemsx PRIVATE QT_NO_KEYWORDS)
-    target_link_libraries(qbluemsx PRIVATE Qt6::Widgets Qt6::OpenGLWidgets)
+    target_link_libraries(qbluemsx PRIVATE bluemsx-theme Qt6::Widgets Qt6::OpenGLWidgets)
 endif()
 
 # ---- Data -------------------------------------------------------------------
 
 # The build tree mirrors the install layout (bin/ + share/bluemsx/), so the
 # executables find their data without installing.
-set(BMX_DATA_DIRS Machines Databases "Keyboard Config" "Shortcut Profiles")
+set(BMX_DATA_DIRS Machines Databases "Keyboard Config" "Shortcut Profiles" Themes)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/share/bluemsx)
 foreach(_d IN LISTS BMX_DATA_DIRS)
     file(CREATE_LINK "${BMX}/ReleaseFiles/${_d}" "${CMAKE_BINARY_DIR}/share/bluemsx/${_d}" SYMBOLIC)
     install(DIRECTORY "${BMX}/ReleaseFiles/${_d}" DESTINATION ${CMAKE_INSTALL_DATADIR}/bluemsx)
+endforeach()
+# Artwork of the built-in Classic themes (Windows resources on Win32).
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/share/bluemsx/Classic)
+foreach(_d classic classic_dark)
+    file(CREATE_LINK "${BMX}/Src/Resources/${_d}" "${CMAKE_BINARY_DIR}/share/bluemsx/Classic/${_d}" SYMBOLIC)
+    install(DIRECTORY "${BMX}/Src/Resources/${_d}" DESTINATION ${CMAKE_INSTALL_DATADIR}/bluemsx/Classic)
 endforeach()

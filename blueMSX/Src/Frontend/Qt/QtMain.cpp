@@ -33,12 +33,18 @@ extern "C" {
 #include <QTimer>
 #include <QWindow>
 
+extern "C" {
+#include "Theme.h"
+}
+#include <cstring>
+
 #include <SDL3/SDL.h>
 #include <cstdio>
 
 namespace qbm {
 
 static MainWindow* theWindow;
+static ThemeView*  theView;     /* set before the themes are first built */
 
 MainWindow* mainWindow() { return theWindow; }
 
@@ -102,21 +108,45 @@ void fillMenu(QMenu* menu, FrontendMenu which)
     menu->clear();
     QtMenuBuilder b(menu);
     fe::buildMenu(which, b);
+
+    /* QblueMSX's own: the window skin, under Window. */
+    if (which == FRONTEND_MENU_ZOOM) {
+        Properties* p = platformGetProperties();
+        menu->addSeparator();
+        QMenu* themes = menu->addMenu(QString::fromUtf8(langPropTheme()));
+        std::vector<std::string> names;
+        for (ThemeCollection* tc : themeList()) names.push_back(tc->name);
+        names.push_back("Qt");
+        for (const std::string& name : names) {
+            QAction* a = themes->addAction(menuText(name == "Qt" ? "Qt (no skin)" : name));
+            bool current = p != NULL && (name == p->settings.themeName ||
+                           (p->settings.themeName[0] == 0 && name == names[0]));
+            a->setCheckable(true);
+            a->setChecked(current);
+            QObject::connect(a, &QAction::triggered, [name]() {
+                QTimer::singleShot(0, [name]() {
+                    Properties* q = platformGetProperties();
+                    snprintf(q->settings.themeName, sizeof(q->settings.themeName), "%s", name.c_str());
+                    if (theWindow) theWindow->applyWindowSettings();
+                });
+            });
+        }
+    }
 }
 
 void MainWindow::rebuildMenuBar()
 {
-    std::vector<fe::MainMenu> menus = fe::mainMenus();
-    QList<QAction*> current = menuBar()->actions();
-    bool same = current.size() == (int)menus.size();
-    for (int i = 0; same && i < (int)menus.size(); i++) {
-        same = current[i]->text() == QString::fromUtf8(menus[i].title);
+    std::vector<fe::MainMenu> titles = fe::mainMenus();
+    QList<QAction*> current = menus()->actions();
+    bool same = current.size() == (int)titles.size();
+    for (int i = 0; same && i < (int)titles.size(); i++) {
+        same = current[i]->text() == QString::fromUtf8(titles[i].title);
     }
     if (same) return;
 
-    menuBar()->clear();
-    for (const fe::MainMenu& m : menus) {
-        QMenu* menu = menuBar()->addMenu(QString::fromUtf8(m.title));
+    menus()->clear();
+    for (const fe::MainMenu& m : titles) {
+        QMenu* menu = menus()->addMenu(QString::fromUtf8(m.title));
         FrontendMenu which = m.menu;
         /* Filled now so the menu is never empty, and again on every show. */
         fillMenu(menu, which);
@@ -124,14 +154,18 @@ void MainWindow::rebuildMenuBar()
     }
 }
 
-void MainWindow::popupMenu(FrontendMenu which)
+void MainWindow::popupMenu(FrontendMenu which, int x, int y)
 {
     QMenu* menu = new QMenu(this);
     menu->setAttribute(Qt::WA_DeleteOnClose);
     fillMenu(menu, which);
-    QPoint pos = QCursor::pos();
-    if (!geometry().contains(pos)) {
-        pos = screenWidget->mapToGlobal(screenWidget->rect().center());
+    QPoint pos;
+    if (x >= 0 && y >= 0 && view->currentPage() != NULL) {
+        pos = view->mapToGlobal(QPoint(x, y));      /* below the theme button */
+    }
+    else {
+        pos = QCursor::pos();
+        if (!geometry().contains(pos)) pos = screen()->mapToGlobal(screen()->rect().center());
     }
     menu->popup(pos);
 }
@@ -248,12 +282,13 @@ void ScreenWidget::mouseReleaseEvent(QMouseEvent* e) { platformMouseButton(msxBu
 
 MainWindow::MainWindow()
 {
-    screenWidget = new ScreenWidget(this);
-    setCentralWidget(screenWidget);
+    view = new ThemeView(this);
+    theView = view;
+    setCentralWidget(view);
     setAcceptDrops(true);
     rebuildMenuBar();
     updateTitle();
-    screenWidget->setFocus();
+    screen()->setFocus();
 }
 
 void MainWindow::updateTitle()
@@ -264,22 +299,57 @@ void MainWindow::updateTitle()
     setWindowTitle(title);
 }
 
+/* The theme collection named in the settings; Classic when unknown, none
+** for "Qt" (plain window). */
+static ThemeCollection* selectedTheme()
+{
+    Properties* p = platformGetProperties();
+    std::vector<ThemeCollection*>& list = themeList();
+    if (p != NULL && strcmp(p->settings.themeName, "Qt") == 0) return NULL;
+    for (ThemeCollection* tc : list) {
+        if (p != NULL && strcmp(tc->name, p->settings.themeName) == 0) return tc;
+    }
+    return list.empty() ? NULL : list[0];
+}
+
 void MainWindow::applyWindowSettings()
 {
     Properties* p = platformGetProperties();
     bool fullscreen = p != NULL && p->video.windowSize == P_VIDEO_SIZEFULLSCREEN;
 
+    setMinimumSize(0, 0);
+    setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
     if (fullscreen) {
-        menuBar()->hide();
+        view->setPage(NULL);
+        menus()->hide();
+        view->layoutPlain();
         showFullScreen();
         return;
     }
-    menuBar()->show();
+    menus()->show();
     if (isFullScreen()) showNormal();
     int zoom = p != NULL ? p->video.windowSize - P_VIDEO_SIZEX1 + 1 : 2;
     if (zoom < 1) zoom = 1;
     if (zoom > 8) zoom = 8;
-    resize(PLATFORM_SCREEN_WIDTH * zoom, PLATFORM_SCREEN_HEIGHT * zoom + menuBar()->sizeHint().height());
+
+    ThemeCollection* tc = selectedTheme();
+    ThemePage* page = NULL;
+    if (tc != NULL) {
+        Theme* theme = zoom < THEME_ZOOM_COUNT ? tc->zoom[zoom] : NULL;
+        if (theme == NULL && zoom != 1) theme = tc->zoom[2];
+        page = theme ? themeGetCurrentPage(theme) : NULL;
+    }
+    view->setPage(page);
+    if (page == NULL) {
+        view->layoutPlain();
+        resize(PLATFORM_SCREEN_WIDTH * zoom, PLATFORM_SCREEN_HEIGHT * zoom + view->menuHeight());
+        return;
+    }
+    /* The page fixes the window: artwork, menu strip and screen. */
+    QRect emu(page->emuWinX, page->emuWinY, PLATFORM_SCREEN_WIDTH * zoom, PLATFORM_SCREEN_HEIGHT * zoom);
+    view->setScreenRect(emu);
+    QSize size(qMax(page->width, emu.right() + 1), qMax(page->height, emu.bottom() + 1));
+    setFixedSize(size);
 }
 
 void MainWindow::closeEvent(QCloseEvent* e)
@@ -294,8 +364,11 @@ void MainWindow::changeEvent(QEvent* e)
     if (e->type() == QEvent::WindowStateChange) {
         Properties* p = platformGetProperties();
         if (p != NULL && !isFullScreen() && p->video.windowSize == P_VIDEO_SIZEFULLSCREEN) {
-            menuBar()->show();
+            menus()->show();
         }
+    }
+    if (e->type() == QEvent::ActivationChange) {
+        view->setActive(isActiveWindow());
     }
     QMainWindow::changeEvent(e);
 }
@@ -347,9 +420,14 @@ static void hookMouseCapture(int on)
     post([on]() { if (theWindow) theWindow->screen()->setMouseCaptured(on != 0); });
 }
 
-static void hookShowMenu(FrontendMenu menu, int, int)
+static void hookShowMenu(FrontendMenu menu, int x, int y)
 {
-    if (theWindow) theWindow->popupMenu(menu);
+    if (theWindow) theWindow->popupMenu(menu, x, y);
+}
+
+static int hookMenuStripHeight()
+{
+    return theView ? theView->menuHeight() : 0;
 }
 
 static void hookShowDialog(FrontendDialog dialog, int arg)
@@ -420,6 +498,7 @@ int main(int argc, char** argv)
     hooks.windowCommand  = hookWindowCommand;
     hooks.chooseFile     = chooseFile;
     hooks.chooseFromList = chooseFromList;
+    hooks.menuStripHeight = hookMenuStripHeight;
 
     /* Qt has parsed its own options out of argv by now. */
     int rc = platformInit(argc, argv, &hooks);

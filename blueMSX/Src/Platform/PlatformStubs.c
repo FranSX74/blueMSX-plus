@@ -86,3 +86,7 @@ int   archRecordVideoIsActive(void) { return 0; }
 
 /* Debug hook */
 void archTrap(UInt8 value) {}
+
+/* Profiling counters a theme can show (THEME_TRIGGER_TEXT_TIMER*); the core
+** does not time anything on this platform. */
+unsigned long long int rdtsc_get_timer(int timer) { return 0; }

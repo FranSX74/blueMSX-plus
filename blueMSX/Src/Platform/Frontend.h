@@ -136,6 +136,10 @@ typedef struct FrontendHooks {
     /* Modal list chooser. Returns the chosen index, or -1 when cancelled;
     ** may update request->autostart. */
     int  (*chooseFromList)(FrontendListRequest* request);
+
+    /* Height of the frontend's menu bar, for themes that lay their artwork
+    ** out below it (archMenuStripHeight). */
+    int  (*menuStripHeight)(void);
 } FrontendHooks;
 
 #ifdef __cplusplus
