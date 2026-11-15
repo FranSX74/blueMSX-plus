@@ -128,8 +128,12 @@ function(bluemsx_frontend target)
     add_executable(${target} ${ARGN} $<TARGET_OBJECTS:bluemsx-platform>)
     target_link_libraries(${target} PRIVATE bluemsx-platform bluemsx-core SDL3::SDL3)
     target_compile_options(${target} PRIVATE -Wall -Wno-unused-parameter)
+    target_include_directories(${target} PRIVATE ${BMX}/Src/Frontend/Common)
     install(TARGETS ${target} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endfunction()
+
+# Toolkit-neutral pieces the full frontends share (menu contents).
+set(BMX_FRONTEND_COMMON ${BMX}/Src/Frontend/Common/FrontendMenus.cpp)
 
 if(BLUEMSX_FRONTEND_SDL)
     bluemsx_frontend(bluemsx-sdl ${BMX}/Src/Frontend/Sdl/SdlMain.c)
@@ -146,7 +150,7 @@ if(BLUEMSX_FRONTEND_IMGUI)
     target_link_libraries(imgui PUBLIC SDL3::SDL3)
 
     set(BMX_IMGUI ${BMX}/Src/Frontend/ImGui)
-    bluemsx_frontend(bluemsx-imgui
+    bluemsx_frontend(bluemsx-imgui ${BMX_FRONTEND_COMMON}
         ${BMX_IMGUI}/ImGuiMain.cpp ${BMX_IMGUI}/ImGuiMenus.cpp ${BMX_IMGUI}/ImGuiDialogs.cpp
         ${BMX_IMGUI}/ImGuiFileDialog.cpp ${BMX_IMGUI}/ImGuiProperties.cpp ${BMX_IMGUI}/ImGuiShortcuts.cpp)
     target_link_libraries(bluemsx-imgui PRIVATE imgui)
