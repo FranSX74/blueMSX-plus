@@ -46,19 +46,6 @@ void archEthDestroy(void) {}
 int  archEthSendPacket(UInt8* buffer, UInt32 length) { return 0; }
 int  archEthRecvPacket(UInt8** buffer, UInt32* length) { return 0; }
 
-/* MIDI */
-void archMidiEnable(int enable) {}
-int  archMidiGetNoteOn(void) { return 0; }
-void archMidiUpdateVolume(int left, int right) {}
-void archMidiLoadState(void) {}
-void archMidiSaveState(void) {}
-ArchMidi* archMidiInCreate(int device, ArchMidiInCb cb, void* ref) { return NULL; }
-void archMidiInDestroy(ArchMidi* archMidi) {}
-int  archMidiInGetNoteOn(ArchMidi* archMidi, int note) { return 0; }
-ArchMidi* archMidiOutCreate(int device) { return NULL; }
-void archMidiOutDestroy(ArchMidi* archMidi) {}
-void archMidiOutTransmit(ArchMidi* archMidi, UInt8 value) {}
-
 /* Serial port */
 void archUartTransmit(UInt8 value) {}
 int  archUartCreate(void (*archUartReceiveCallback)(UInt8)) { return 1; }

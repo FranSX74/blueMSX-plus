@@ -250,6 +250,8 @@ int platformInit(int argc, char** argv, const FrontendHooks* frontendHooks)
     midiIoSetMidiOutType(properties->sound.MidiOut.type, properties->sound.MidiOut.fileName);
     midiIoSetMidiInType(properties->sound.MidiIn.type, properties->sound.MidiIn.fileName);
     ykIoSetMidiInType(properties->sound.YkIn.type, properties->sound.YkIn.fileName);
+    platformMidiSetMt32ToGm(properties->sound.MidiOut.mt32ToGm);
+    platformMidiSetChannelFilter(properties->sound.YkIn.channel);
 
     emulatorRestartSound();
 
@@ -333,6 +335,31 @@ void platformSaveProperties(void)
     if (properties != NULL) propSave(properties);
 }
 
+static void applyMidi(Properties* p, const Properties* old)
+{
+    if (p->sound.MidiOut.type != old->sound.MidiOut.type ||
+        strcmp(p->sound.MidiOut.name, old->sound.MidiOut.name) != 0 ||
+        strcmp(p->sound.MidiOut.fileName, old->sound.MidiOut.fileName) != 0) {
+        midiIoSetMidiOutType(p->sound.MidiOut.type, p->sound.MidiOut.fileName);
+    }
+    if (p->sound.MidiIn.type != old->sound.MidiIn.type ||
+        strcmp(p->sound.MidiIn.name, old->sound.MidiIn.name) != 0 ||
+        strcmp(p->sound.MidiIn.fileName, old->sound.MidiIn.fileName) != 0) {
+        midiIoSetMidiInType(p->sound.MidiIn.type, p->sound.MidiIn.fileName);
+    }
+    if (p->sound.YkIn.type != old->sound.YkIn.type ||
+        strcmp(p->sound.YkIn.name, old->sound.YkIn.name) != 0 ||
+        strcmp(p->sound.YkIn.fileName, old->sound.YkIn.fileName) != 0) {
+        ykIoSetMidiInType(p->sound.YkIn.type, p->sound.YkIn.fileName);
+    }
+    if (p->sound.MidiOut.mt32ToGm != old->sound.MidiOut.mt32ToGm) {
+        platformMidiSetMt32ToGm(p->sound.MidiOut.mt32ToGm);
+    }
+    if (p->sound.YkIn.channel != old->sound.YkIn.channel) {
+        platformMidiSetChannelFilter(p->sound.YkIn.channel);
+    }
+}
+
 void platformApplyProperties(const Properties* old)
 {
     Properties* p = properties;
@@ -359,13 +386,15 @@ void platformApplyProperties(const Properties* old)
         strcmp(p->ports.Com.fileName, old->ports.Com.fileName) != 0) {
         uartIoSetType(p->ports.Com.type, p->ports.Com.fileName);
     }
-    if (p->sound.MidiOut.type != old->sound.MidiOut.type ||
-        strcmp(p->sound.MidiOut.fileName, old->sound.MidiOut.fileName) != 0) {
-        midiIoSetMidiOutType(p->sound.MidiOut.type, p->sound.MidiOut.fileName);
-    }
-    if (p->sound.MidiIn.type != old->sound.MidiIn.type ||
-        strcmp(p->sound.MidiIn.fileName, old->sound.MidiIn.fileName) != 0) {
-        midiIoSetMidiInType(p->sound.MidiIn.type, p->sound.MidiIn.fileName);
+    /* Reopening a MIDI device under the emulator thread would free the
+    ** handle it is transmitting through: pause around the change. */
+    if (memcmp(&p->sound.MidiIn, &old->sound.MidiIn, sizeof(p->sound.MidiIn)) != 0 ||
+        memcmp(&p->sound.MidiOut, &old->sound.MidiOut, sizeof(p->sound.MidiOut)) != 0 ||
+        memcmp(&p->sound.YkIn, &old->sound.YkIn, sizeof(p->sound.YkIn)) != 0) {
+        int running = emulatorGetState() == EMU_RUNNING;
+        if (running) emulatorSuspend();
+        applyMidi(p, old);
+        if (running) emulatorResume();
     }
 
     boardSetFdcTimingEnable(p->emulation.enableFdcTiming);
@@ -435,6 +464,7 @@ void platformShutdown(void)
     archRecordVideoStop();      /* finish the MP4 before the mixer goes */
     emulatorStop();
     emulatorExit();
+    platformMidiShutdown();
 
     /* Wake a frame wait that may still be pending. */
     if (displayAckEvent != NULL) archEventSet(displayAckEvent);

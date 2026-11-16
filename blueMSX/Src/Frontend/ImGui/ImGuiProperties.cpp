@@ -11,6 +11,7 @@
 ******************************************************************************
 */
 #include "ImGuiApp.h"
+#include "FrontendMidi.h"
 
 extern "C" {
 #include "PlatformShortcuts.h"
@@ -45,8 +46,8 @@ void openProperties(int page)
     ** as PROP_VIDEO; both live on the Video tab here. */
     case PROP_VIDEO: case PROP_D3D:
     case PROP_PERFORMANCE:                requestedTab = 1; break;
-    case PROP_SOUND: case PROP_MIDI:      requestedTab = 2; break;
-    case PROP_PORTS:                      requestedTab = 3; break;
+    case PROP_SOUND:                      requestedTab = 2; break;
+    case PROP_PORTS: case PROP_MIDI:      requestedTab = 3; break;
     default:                              requestedTab = 4; break;
     }
     machines.clear();
@@ -244,6 +245,31 @@ static void pageSound(Properties* p)
     }
 }
 
+/* A MIDI device selector (FrontendMidi.h). The sequencer is asked for its
+** ports only while the list is open. */
+static void midiCombo(const char* id, int* type, char* name, char* desc, bool output, bool withFile)
+{
+    std::string preview = langPropPortsNone();
+    if (*type == P_MIDI_FILE) preview = langPropPortsFile();
+    else if (*type == P_MIDI_HOST) {
+        preview = strcmp(name, "virtual") == 0 ? midiText("blueMSX port (connect it yourself)",
+                                                          "Puerto de blueMSX (conectar a mano)")
+                                               : (desc[0] ? desc : name);
+    }
+    std::string label = std::string(langTextDevice()) + id;
+    if (!ImGui::BeginCombo(label.c_str(), preview.c_str())) return;
+    int selected;
+    std::vector<MidiChoice> list = midiChoices(output, withFile, *type, name, &selected);
+    for (int i = 0; i < (int)list.size(); i++) {
+        ImGui::PushID(i);
+        if (ImGui::Selectable(list[i].label.c_str(), i == selected)) {
+            midiSelect(list[i], type, name, 256, desc, 256);
+        }
+        ImGui::PopID();
+    }
+    ImGui::EndCombo();
+}
+
 static void pagePorts(Properties* p)
 {
     heading(langPropPortsLptGB());
@@ -281,10 +307,28 @@ static void pagePorts(Properties* p)
     }
 
     heading(langPropSndMidiOutGB());
-    const char* midi[] = { langPropPortsNone(), langPropPortsFile() };
-    combo("MIDI out", &p->sound.MidiOut.type, midi, 2);
+    midiCombo("##midiout", &p->sound.MidiOut.type, p->sound.MidiOut.name, p->sound.MidiOut.desc, true, true);
     if (p->sound.MidiOut.type == P_MIDI_FILE) {
         ImGui::InputText("##midifile", p->sound.MidiOut.fileName, sizeof(p->sound.MidiOut.fileName));
+    }
+    if (p->sound.MidiOut.type == P_MIDI_HOST) {
+        bool on = p->sound.MidiOut.mt32ToGm != 0;
+        if (ImGui::Checkbox(langPropSndMt32ToGm(), &on)) p->sound.MidiOut.mt32ToGm = on ? 1 : 0;
+    }
+
+    heading(langPropSndMidiInGB());
+    midiCombo("##midiin", &p->sound.MidiIn.type, p->sound.MidiIn.name, p->sound.MidiIn.desc, false, false);
+
+    heading(langPropSndYkInGB());
+    midiCombo("##ykin", &p->sound.YkIn.type, p->sound.YkIn.name, p->sound.YkIn.desc, false, false);
+    if (p->sound.YkIn.type == P_MIDI_HOST) {
+        static char numbers[16][4];
+        const char* channels[17] = { langPropSndMidiAll() };
+        for (int i = 0; i < 16; i++) {
+            snprintf(numbers[i], sizeof(numbers[i]), "%d", i + 1);
+            channels[i + 1] = numbers[i];
+        }
+        combo(langPropSndMidiChannel(), &p->sound.YkIn.channel, channels, 17);
     }
 }
 

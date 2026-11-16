@@ -19,6 +19,7 @@ void platformInputShutdown(void);
 void platformInputInit(void);
 void platformFrontendMouseCapture(int capture);
 void platformFrontendMessage(FrontendMessageKind kind, const char* text);
+void platformMidiShutdown(void);
 
 /* Sends the mix to `callback` instead of the sound card (NULL: back to it);
 ** takes effect when the sound restarts. */

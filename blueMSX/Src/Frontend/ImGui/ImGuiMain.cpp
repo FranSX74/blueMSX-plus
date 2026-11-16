@@ -437,7 +437,8 @@ int runModal(const std::function<int()>& draw)
 
 /* ---- Scripted input for automated checks --------------------------------------
 ** BLUEMSX_TEST="2.0 move 40 10; 2.2 click; 3 snap /tmp/a.bmp; 3.5 key F12; 5 quit"
-** Times are seconds from start-up; snap saves the window as BMP. */
+** Times are seconds from start-up; snap saves the window as BMP;
+** "dialog N ARG" opens a FrontendDialog (PropPage ARG for 0). */
 
 struct TestStep { double t; std::string cmd, a, b; };
 static std::vector<TestStep> testSteps;
@@ -517,6 +518,9 @@ static void testRun()
             ev.text.windowID = wid;
             ev.text.text = keep.c_str();
             testPush(ev);
+        }
+        else if (st.cmd == "dialog") {
+            openDialog((FrontendDialog)atoi(st.a.c_str()), atoi(st.b.c_str()));
         }
         else if (st.cmd == "snap") {
             pendingSnap = st.a;

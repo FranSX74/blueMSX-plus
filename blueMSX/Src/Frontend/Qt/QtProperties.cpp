@@ -13,6 +13,7 @@
 ******************************************************************************
 */
 #include "QtApp.h"
+#include "FrontendMidi.h"
 
 extern "C" {
 #include "PlatformShortcuts.h"
@@ -45,6 +46,7 @@ extern "C" {
 #include <QVBoxLayout>
 
 #include <cstring>
+#include <memory>
 
 namespace qbm {
 
@@ -464,6 +466,28 @@ static QWidget* pageSound(std::vector<std::function<void()>>* syncs)
     return page;
 }
 
+/* A MIDI device selector (FrontendMidi.h); the list is read again on every
+** sync, so synths started after the dialog opened show up. */
+static void midiCombo(Page* page, int* type, char* name, char* desc, bool output, bool withFile)
+{
+    auto* box = new QComboBox;
+    auto choices = std::make_shared<std::vector<MidiChoice>>();
+    page->form->addRow(u8(langTextDevice()), box);
+    QObject::connect(box, &QComboBox::activated, [choices, type, name, desc](int i) {
+        if (i < 0 || i >= (int)choices->size()) return;
+        MidiChoice c = (*choices)[i];
+        change([&](Properties*) { midiSelect(c, type, name, 256, desc, 256); });
+    });
+    page->onSync([box, choices, type, name, output, withFile]() {
+        int selected;
+        *choices = midiChoices(output, withFile, *type, name, &selected);
+        QSignalBlocker b(box);
+        box->clear();
+        for (const MidiChoice& c : *choices) box->addItem(u8(c.label.c_str()));
+        box->setCurrentIndex(selected);
+    });
+}
+
 static QWidget* pagePorts(std::vector<std::function<void()>>* syncs)
 {
     Properties* p = platformGetProperties();
@@ -495,9 +519,21 @@ static QWidget* pagePorts(std::vector<std::function<void()>>* syncs)
                [p]() { return p->ports.Com.type == P_COM_FILE; });
 
     page->group(langPropSndMidiOutGB());
-    page->combo("MIDI out", &p->sound.MidiOut.type, { u8(langPropPortsNone()), u8(langPropPortsFile()) });
+    midiCombo(page, &p->sound.MidiOut.type, p->sound.MidiOut.name, p->sound.MidiOut.desc, true, true);
     page->text(langPropPortsFile(), p->sound.MidiOut.fileName, sizeof(p->sound.MidiOut.fileName),
                [p]() { return p->sound.MidiOut.type == P_MIDI_FILE; });
+    page->check(langPropSndMt32ToGm(), &p->sound.MidiOut.mt32ToGm,
+                [p]() { return p->sound.MidiOut.type == P_MIDI_HOST; });
+
+    page->group(langPropSndMidiInGB());
+    midiCombo(page, &p->sound.MidiIn.type, p->sound.MidiIn.name, p->sound.MidiIn.desc, false, false);
+
+    page->group(langPropSndYkInGB());
+    midiCombo(page, &p->sound.YkIn.type, p->sound.YkIn.name, p->sound.YkIn.desc, false, false);
+    QStringList channels = { u8(langPropSndMidiAll()) };
+    for (int i = 1; i <= 16; i++) channels << QString::number(i);
+    page->combo(langPropSndMidiChannel(), &p->sound.YkIn.channel, channels,
+                [p]() { return p->sound.YkIn.type == P_MIDI_HOST; });
 
     page->finish();
     return page;
@@ -594,8 +630,8 @@ void openProperties(int page)
     ** as PROP_VIDEO; both live on the Video tab here. */
     case PROP_VIDEO: case PROP_D3D:
     case PROP_PERFORMANCE:                tab = 1; break;
-    case PROP_SOUND: case PROP_MIDI:      tab = 2; break;
-    case PROP_PORTS:                      tab = 3; break;
+    case PROP_SOUND:                      tab = 2; break;
+    case PROP_PORTS: case PROP_MIDI:      tab = 3; break;
     default:                              tab = 4; break;
     }
     /* Labels follow the language: build it anew each time it opens. */

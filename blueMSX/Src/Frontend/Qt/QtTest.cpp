@@ -12,6 +12,8 @@
 **                  (Return, Escape, Tab, Up, Down, Left, Right, Space)
 **   text STR       type text into the focused Qt widget
 **   click X Y      left click at X,Y of the active window (logical pixels)
+**   combo N TEXT   choose the first item starting with TEXT in the Nth
+**                  visible combo box of the active window (from 0)
 **   snap FILE      save the active window (dialog, popup or main) as an image
 **   snapgl FILE    save what the emulated screen widget shows
 **   render CAP MP4 render a replay to video (Create video clip, no file dialogs)
@@ -26,6 +28,7 @@
 #include "QtApp.h"
 
 #include <QAction>
+#include <QComboBox>
 #include <QApplication>
 #include <QDialog>
 #include <QElapsedTimer>
@@ -152,6 +155,22 @@ static void run(const Step& st)
         QMouseEvent release(QEvent::MouseButtonRelease, local, global, Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
         QApplication::sendEvent(target, &press);
         QApplication::sendEvent(target, &release);
+    }
+    else if (st.cmd == "combo") {
+        int n = st.arg.section(' ', 0, 0).toInt();
+        QString text = st.arg.section(' ', 1);
+        int seen = 0;
+        for (QComboBox* box : activeWindow()->findChildren<QComboBox*>()) {
+            if (!box->isVisibleTo(activeWindow()) || seen++ != n) continue;
+            int i = box->findText(text, Qt::MatchStartsWith);
+            if (i < 0) {
+                fprintf(stderr, "test: no item %s\n", text.toUtf8().constData());
+                break;
+            }
+            box->setCurrentIndex(i);
+            Q_EMIT box->activated(i);
+            break;
+        }
     }
     else if (st.cmd == "snap") {
         QWidget* w = activeWindow();

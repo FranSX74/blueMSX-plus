@@ -126,6 +126,7 @@ target_compile_options(bluemsx-theme PRIVATE -w
 add_library(bluemsx-platform OBJECT
     ${BMX}/Src/Platform/Platform.c
     ${BMX}/Src/Platform/PlatformInput.c
+    ${BMX}/Src/Platform/PlatformMidi.c
     ${BMX}/Src/Platform/PlatformPaths.c
     ${BMX}/Src/Platform/PlatformRecorder.cpp
     ${BMX}/Src/Platform/PlatformShortcuts.c
@@ -154,6 +155,22 @@ if(FFMPEG_FOUND)
     target_link_libraries(bluemsx-platform PUBLIC PkgConfig::FFMPEG)
 else()
     message(STATUS "Video recording: off (FFmpeg libraries not found)")
+endif()
+
+# MIDI in/out through the ALSA sequencer (Linux; FreeBSD has alsa-lib too).
+option(BLUEMSX_ALSA "MIDI with the ALSA sequencer" ON)
+if(BLUEMSX_ALSA)
+    find_package(PkgConfig)
+    if(PkgConfig_FOUND)
+        pkg_check_modules(ALSA IMPORTED_TARGET alsa)
+    endif()
+endif()
+if(ALSA_FOUND)
+    message(STATUS "MIDI: ALSA ${ALSA_VERSION}")
+    target_compile_definitions(bluemsx-platform PRIVATE BLUEMSX_HAVE_ALSA)
+    target_link_libraries(bluemsx-platform PUBLIC PkgConfig::ALSA)
+else()
+    message(STATUS "MIDI: off (ALSA not found)")
 endif()
 
 # A frontend executable: its own sources + the platform objects + the core.

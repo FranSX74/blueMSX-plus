@@ -103,6 +103,23 @@ void platformRecorderGiveFrame(const void* pixels, int width, int height, int pi
 /* Tells the emulator the frame requested by displayUpdate was presented. */
 void platformDisplayDone(void);
 
+/* ---- MIDI (ALSA sequencer) ---------------------------------------------- */
+
+/* A device for sound.MidiOut/MidiIn/YkIn.name (type P_MIDI_HOST): `id` is
+** what the properties keep, `name` what the user sees. "virtual" is our own
+** port left unconnected. */
+typedef struct {
+    char id[256];
+    char name[256];
+} PlatformMidiPort;
+
+int  platformMidiAvailable(void);
+/* Synth/output ports when `output`, else input sources; returns how many
+** exist (may exceed `max`). */
+int  platformMidiListPorts(int output, PlatformMidiPort* ports, int max);
+void platformMidiSetMt32ToGm(int enable);
+void platformMidiSetChannelFilter(int channel);     /* 0 all, 1..16 */
+
 /* ---- Input --------------------------------------------------------------- */
 
 /* Keys are USB HID usage codes, the numbering of SDL_Scancode. */
