@@ -693,6 +693,7 @@ static void boardCaptureLoadState()
                 cap.initStateSize = (int)fread(cap.initState, 1, sizeof(cap.initState), f);
                 fclose(f);
             }
+            remove("cap.tmp");
         }
     }
     
