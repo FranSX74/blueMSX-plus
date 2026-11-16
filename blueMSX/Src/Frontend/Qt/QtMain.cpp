@@ -68,6 +68,7 @@ static QString menuText(const std::string& s)
 class QtMenuBuilder : public fe::MenuBuilder {
 public:
     explicit QtMenuBuilder(QMenu* root) { stack.push_back(root); }
+    bool hasDebugger() const override { return true; }
 
     void item(const std::string& label, int sc, bool enabled, int check,
               std::function<void()> fn) override

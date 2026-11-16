@@ -42,6 +42,8 @@ public:
     ** endMenu() closes it. */
     virtual bool beginMenu(const std::string& label, bool enabled = true) = 0;
     virtual void endMenu() = 0;
+    /* Tools > Debugger is listed only by frontends that have one. */
+    virtual bool hasDebugger() const { return false; }
 };
 
 struct MainMenu {

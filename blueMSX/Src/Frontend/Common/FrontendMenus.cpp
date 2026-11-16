@@ -606,6 +606,10 @@ static void menuTools(MenuBuilder& b)
 {
     item(b, langMenuToolsShortcuts(), SC_TOOL_SHORTCUT_EDITOR, []() { actionToolsShowShorcutEditor(); });
     item(b, langMenuToolsMixer(), SC_TOOL_MIXER, []() { actionToolsShowMixer(); });
+    if (b.hasDebugger()) {
+        b.separator();
+        item(b, langMenuToolsDebugger(), SC_TOOL_DEBUGGER, []() { actionToolsShowDebugger(); });
+    }
 }
 
 static void menuHelp(MenuBuilder& b)
