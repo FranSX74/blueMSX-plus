@@ -152,8 +152,17 @@ static int listPorts(int output, PlatformMidiPort* ports, int max)
                 PlatformMidiPort* p = &ports[count];
                 snprintf(p->id, sizeof(p->id), "%s:%s", snd_seq_client_info_get_name(ci),
                          snd_seq_port_info_get_name(pi));
-                snprintf(p->name, sizeof(p->name), "%s (%d:%d)", snd_seq_port_info_get_name(pi),
-                         client, snd_seq_port_info_get_port(pi));
+                const char* cname = snd_seq_client_info_get_name(ci);
+                const char* pname = snd_seq_port_info_get_name(pi);
+                /* "Midi Through Port-0" says it all; FreeBSD's "port-0" does not. */
+                if (strncmp(pname, cname, strlen(cname)) == 0) {
+                    snprintf(p->name, sizeof(p->name), "%s (%d:%d)", pname, client,
+                             snd_seq_port_info_get_port(pi));
+                }
+                else {
+                    snprintf(p->name, sizeof(p->name), "%s: %s (%d:%d)", cname, pname, client,
+                             snd_seq_port_info_get_port(pi));
+                }
             }
             count++;
         }
