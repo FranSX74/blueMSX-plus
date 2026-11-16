@@ -339,6 +339,7 @@ void openDialog(FrontendDialog dialog, int arg)
     case FRONTEND_DIALOG_SHORTCUTS:    openShortcutEditor(); break;
     case FRONTEND_DIALOG_MIXER:        mixerOpen = true; break;
     case FRONTEND_DIALOG_RENDER_VIDEO: renderOpen = true; break;
+    case FRONTEND_DIALOG_DEBUGGER:     openDebugger(); break;
     default:
         showMessage(FRONTEND_MESSAGE_INFO, "Not available in this version yet.");
         break;
@@ -377,6 +378,7 @@ static void drawRenderProgress()
 
 void drawDialogs()
 {
+    drawDebugger();
     drawRenderProgress();
     drawProperties();
     drawShortcutEditor();

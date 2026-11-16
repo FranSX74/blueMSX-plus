@@ -19,7 +19,12 @@ extern "C" {
 #include <functional>
 #include <string>
 
+struct ImFont;
+
 namespace app {
+
+/* Fixed-width font (debugger listings); NULL until the fonts are set up. */
+extern ImFont* monoFont;
 
 extern SDL_Window*   window;
 extern SDL_Renderer* renderer;
@@ -59,6 +64,13 @@ void openShortcutEditor();
 void drawShortcutEditor();
 /* While the editor waits for a key, it takes the next key press. */
 bool shortcutEditorWantsKey(int scancode, int mods);
+
+/* ---- ImGuiDebugger.cpp ---- */
+void openDebugger();
+void drawDebugger();
+void closeDebugger();
+/* The debugger window has the focus: keys are its own. */
+bool debuggerWantsKeys();
 
 /* Helpers */
 const char* clean(const char* path);    /* file name of a path, "" for NULL */

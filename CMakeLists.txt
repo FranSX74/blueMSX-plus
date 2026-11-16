@@ -203,7 +203,8 @@ if(BLUEMSX_FRONTEND_IMGUI)
     set(BMX_IMGUI ${BMX}/Src/Frontend/ImGui)
     bluemsx_frontend(bluemsx-imgui ${BMX_FRONTEND_COMMON}
         ${BMX_IMGUI}/ImGuiMain.cpp ${BMX_IMGUI}/ImGuiMenus.cpp ${BMX_IMGUI}/ImGuiDialogs.cpp
-        ${BMX_IMGUI}/ImGuiFileDialog.cpp ${BMX_IMGUI}/ImGuiProperties.cpp ${BMX_IMGUI}/ImGuiShortcuts.cpp)
+        ${BMX_IMGUI}/ImGuiFileDialog.cpp ${BMX_IMGUI}/ImGuiProperties.cpp ${BMX_IMGUI}/ImGuiShortcuts.cpp
+        ${BMX_IMGUI}/ImGuiDebugger.cpp)
     target_link_libraries(bluemsx-imgui PRIVATE imgui)
 endif()
 

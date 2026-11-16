@@ -994,3 +994,101 @@ int Session::parseAddress(const std::string& text) const
 }
 
 }
+
+namespace dbg {
+
+const char* text(const char* english, const char* spanish)
+{
+    return langGetLanguage() == EMU_LANG_SPANISH ? spanish : english;
+}
+
+std::vector<Session::StackEntry> Session::stackEntries(int max) const
+{
+    std::vector<StackEntry> list;
+    if (!valid) return list;
+    for (int a = sp; a < 0x10000 && (int)list.size() < max; a += 2) {
+        int hi = (a + 1) & 0xffff;
+        uint16_t v = (uint16_t)(memory[a] | (memory[hi] << 8));
+        uint16_t o = (uint16_t)(memoryBefore[a] | (memoryBefore[hi] << 8));
+        list.push_back(StackEntry{ (uint16_t)a, v, v != o });
+    }
+    return list;
+}
+
+std::vector<Session::CallEntry> Session::callEntries() const
+{
+    std::vector<CallEntry> list;
+    if (!valid) return list;
+    for (int i = (int)callstack.size() - 1; i >= 0; i--) {
+        CallEntry e;
+        e.ret = (uint16_t)callstack[i];
+        /* 3 bytes back for call / call cc, 1 for rst. */
+        e.from = (uint16_t)(e.ret - 3);
+        uint8_t op = memory[e.from];
+        bool isCall = op == 0xcd || (op & 0xc7) == 0xc4;
+        if (!isCall) e.from = (uint16_t)(e.ret - 1);
+        bool isRst = (memory[e.from] & 0xc7) == 0xc7;
+        e.interrupt = !isCall && !isRst;
+        if (e.interrupt) {
+            e.from = e.ret;
+            e.text = text("(interrupt)", "(interrupción)");
+        }
+        else {
+            std::string t;
+            disassemble(symbols, memory.data(), e.from, t);
+            /* Squeeze the mnemonic padding. */
+            std::string squeezed;
+            for (char c : t) {
+                if (c == ' ' && !squeezed.empty() && squeezed.back() == ' ') continue;
+                squeezed += c;
+            }
+            while (!squeezed.empty() && squeezed.back() == ' ') squeezed.pop_back();
+            char addr[8];
+            snprintf(addr, sizeof(addr), "%04X: ", e.from);
+            e.text = addr + squeezed;
+        }
+        list.push_back(e);
+    }
+    return list;
+}
+
+std::vector<Session::Flag> Session::flags(bool asmStyle) const
+{
+    std::vector<Flag> list;
+    int af = cpuIndex("AF");
+    uint8_t f = valid && af >= 0 ? (uint8_t)cpu[af].value : 0;
+    if (asmStyle) {
+        int iff = cpuIndex("IFF1");
+        bool ei = valid && iff >= 0 && cpu[iff].value != 0;
+        static const char* names[5][2] = { { "NZ", "Z" }, { "NC", "C" }, { "PO", "PE" }, { "P", "M" }, { "DI", "EI" } };
+        bool on[5] = { (f & 0x40) != 0, (f & 0x01) != 0, (f & 0x04) != 0, (f & 0x80) != 0, ei };
+        for (int i = 0; i < 5; i++) list.push_back(Flag{ names[i][on[i] ? 1 : 0], on[i] });
+    }
+    else {
+        static const char* names = "SZYHXPNC";
+        for (int i = 0; i < 8; i++) list.push_back(Flag{ std::string(1, names[i]), ((f >> (7 - i)) & 1) != 0 });
+    }
+    return list;
+}
+
+void Session::toggleFlag(int index, bool asmStyle)
+{
+    int af = cpuIndex("AF");
+    if (af < 0 || !valid) return;
+    uint32_t v = cpu[af].value;
+    if (!asmStyle) {
+        writeCpu(af, v ^ (0x80 >> index));
+        return;
+    }
+    static const int bits[4] = { 0x40, 0x01, 0x04, 0x80 };
+    if (index < 4) {
+        writeCpu(af, v ^ bits[index]);
+        return;
+    }
+    int iff1 = cpuIndex("IFF1"), iff2 = cpuIndex("IFF2");
+    bool ei = iff1 >= 0 && cpu[iff1].value != 0;
+    if (iff1 >= 0) writeCpu(iff1, ei ? 0 : 1);
+    if (iff2 >= 0) writeCpu(iff2, ei ? 0 : 1);
+}
+
+}

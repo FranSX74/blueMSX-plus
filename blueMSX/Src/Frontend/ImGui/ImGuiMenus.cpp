@@ -35,6 +35,7 @@ public:
         ImGui::PopID();
     }
     void separator() override { ImGui::Separator(); }
+    bool hasDebugger() const override { return true; }
     void caption(const std::string& label) override { ImGui::TextDisabled("%s", label.c_str()); }
     bool beginMenu(const std::string& label, bool enabled) override
     {

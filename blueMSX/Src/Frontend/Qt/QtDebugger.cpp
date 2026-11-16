@@ -1110,100 +1110,48 @@ private:
         }
         filling = false;
 
-        int af = session.cpuIndex("AF");
-        uint8_t f = af >= 0 && session.hasSnapshot() ? (uint8_t)session.cpu[af].value : 0;
-        if (asmFlags) {
-            /* The conditions as instructions name them, like the Windows debugger. */
-            int iff = session.cpuIndex("IFF1");
-            bool ei = iff >= 0 && session.cpu[iff].value != 0;
-            const char* text[5][2] = { { "NZ", "Z" }, { "NC", "C" }, { "PO", "PE" }, { "P", "M" }, { "DI", "EI" } };
-            bool on[5] = { (f & 0x40) != 0, (f & 0x01) != 0, (f & 0x04) != 0, (f & 0x80) != 0, ei };
-            for (int i = 0; i < 8; i++) {
-                QPushButton* b = flagButtons[i];
-                b->setVisible(i < 5);
-                if (i < 5) {
-                    b->setText(text[i][on[i] ? 1 : 0]);
-                    b->setChecked(on[i]);
-                }
-            }
-        }
-        else {
-            const char* names = "SZYHXPNC";
-            for (int i = 0; i < 8; i++) {
-                QPushButton* b = flagButtons[i];
-                b->setVisible(true);
-                b->setText(QString(QChar(names[i])));
-                b->setChecked((f >> (7 - i)) & 1);
+        std::vector<dbg::Session::Flag> flags = session.flags(asmFlags);
+        for (int i = 0; i < (int)flagButtons.size(); i++) {
+            QPushButton* b = flagButtons[i];
+            b->setVisible(i < (int)flags.size());
+            if (i < (int)flags.size()) {
+                b->setText(QString::fromStdString(flags[i].name));
+                b->setChecked(flags[i].on);
             }
         }
     }
 
     void flagClicked(int i)
     {
-        int af = session.cpuIndex("AF");
-        if (af < 0 || !session.hasSnapshot()) return;
-        uint32_t v = session.cpu[af].value;
-        if (asmFlags) {
-            static const int bits[4] = { 0x40, 0x01, 0x04, 0x80 };
-            if (i < 4) session.writeCpu(af, v ^ bits[i]);
-            else {
-                int iff1 = session.cpuIndex("IFF1"), iff2 = session.cpuIndex("IFF2");
-                bool ei = iff1 >= 0 && session.cpu[iff1].value != 0;
-                if (iff1 >= 0) session.writeCpu(iff1, ei ? 0 : 1);
-                if (iff2 >= 0) session.writeCpu(iff2, ei ? 0 : 1);
-            }
-        }
-        else {
-            session.writeCpu(af, v ^ (0x80 >> i));
-        }
+        session.toggleFlag(i, asmFlags);
         refreshAll(false);
     }
 
     void fillStack()
     {
         stackTable->setRowCount(0);
-        if (!session.hasSnapshot()) return;
-        const auto& m = session.memory;
-        const auto& old = session.memoryBefore;
-        int rows = 0;
-        for (int a = session.sp; a < 0x10000 && rows < 128; a += 2, rows++) {
-            int hi = (a + 1) & 0xffff;
-            uint16_t v = (uint16_t)(m[a] | (m[hi] << 8));
-            uint16_t o = (uint16_t)(old[a] | (old[hi] << 8));
-            stackTable->insertRow(rows);
-            stackTable->setItem(rows, 0, cell(hex(a, 4)));
-            const char* label = session.symbols.find(v);
-            stackTable->setItem(rows, 1, cell(hex(v, 4) + (label ? QString("  ") + label : QString()), false, v != o, this));
+        int row = 0;
+        for (const dbg::Session::StackEntry& e : session.stackEntries()) {
+            stackTable->insertRow(row);
+            stackTable->setItem(row, 0, cell(hex(e.address, 4)));
+            const char* label = session.symbols.find(e.value);
+            stackTable->setItem(row, 1, cell(hex(e.value, 4) + (label ? QString("  ") + label : QString()), false, e.changed, this));
+            row++;
         }
     }
 
     void fillCallstack()
     {
         callTable->setRowCount(0);
-        if (!session.hasSnapshot()) return;
-        const auto& m = session.memory;
         int row = 0;
-        for (int i = (int)session.callstack.size() - 1; i >= 0; i--, row++) {
-            uint16_t ret = (uint16_t)session.callstack[i];
-            /* The call that pushed it: 3 bytes for call/call cc, 1 for rst. */
-            uint16_t from = (uint16_t)(ret - 3);
-            uint8_t op = m[from];
-            bool isCall = op == 0xcd || (op & 0xc7) == 0xc4;
-            if (!isCall) from = (uint16_t)(ret - 1);
-            bool isRst = (m[from] & 0xc7) == 0xc7;
-            std::string text;
-            if (isCall || isRst) dbg::disassemble(session.symbols, m.data(), from, text);
-            else {
-                /* Nothing called from there: an interrupt pushed the address. */
-                from = ret;
-                text = tr2("(interrupt)", "(interrupción)");
-            }
+        for (const dbg::Session::CallEntry& e : session.callEntries()) {
             callTable->insertRow(row);
-            const char* label = session.symbols.find(ret);
-            QTableWidgetItem* r = cell(label ? QString(label) : hex(ret, 4));
-            r->setData(Qt::UserRole, (int)from);
+            const char* label = session.symbols.find(e.ret);
+            QTableWidgetItem* r = cell(label ? QString(label) : hex(e.ret, 4));
+            r->setData(Qt::UserRole, (int)e.from);
             callTable->setItem(row, 0, r);
-            callTable->setItem(row, 1, cell(isCall || isRst ? hex(from, 4) + ": " + QString::fromLatin1(text.c_str()).simplified() : QString::fromUtf8(text.c_str())));
+            callTable->setItem(row, 1, cell(QString::fromUtf8(e.text.c_str())));
+            row++;
         }
     }
 

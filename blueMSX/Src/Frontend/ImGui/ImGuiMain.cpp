@@ -44,6 +44,8 @@ static bool         mouseCaptured;
 static bool         keyboardToMsx = true;
 static ImVec2       screenMin, screenMax;     /* emulated screen, in window points */
 static Uint64       lastMouseMove;
+ImFont* monoFont = NULL;
+
 static std::vector<std::function<void()>> deferred;
 static std::string  iniPath;
 
@@ -198,6 +200,15 @@ static void setupFonts(float scale)
         "/usr/share/fonts/google-noto-cjk/NotoSansCJK-Regular.ttc",
         NULL
     };
+    static const char* const mono[] = {
+        "/usr/share/fonts/noto/NotoSansMono-Regular.ttf",
+        "/usr/share/fonts/truetype/noto/NotoSansMono-Regular.ttf",
+        "/usr/share/fonts/google-noto/NotoSansMono-Regular.ttf",
+        "/usr/share/fonts/TTF/DejaVuSansMono.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
+        "/usr/share/fonts/dejavu/DejaVuSansMono.ttf",
+        NULL
+    };
     ImGuiIO& io = ImGui::GetIO();
     ImGuiStyle& style = ImGui::GetStyle();
     const char* main = firstFile(latin);
@@ -219,6 +230,11 @@ static void setupFonts(float scale)
             io.Fonts->AddFontFromFileTTF(f, 0.0f, &cfg);
         }
     }
+    /* Fixed width, for the debugger's listings: added last, so the main
+    ** font stays the default and the CJK one merges into it. */
+    const char* m = firstFile(mono);
+    monoFont = m != NULL ? io.Fonts->AddFontFromFileTTF(m) : NULL;
+    if (monoFont == NULL) monoFont = io.Fonts->AddFontDefault();
 }
 
 static void setupStyle(float scale)
@@ -344,6 +360,11 @@ static void handleKey(const SDL_KeyboardEvent& key)
     ImGuiIO& io = ImGui::GetIO();
     if (key.repeat) return;
     if (key.down && shortcutEditorWantsKey(key.scancode, platformShortcutMods())) return;
+    if (debuggerWantsKeys()) {
+        /* The debugger's own keys; only let go of what the MSX may hold. */
+        if (!key.down) platformShortcutKey(key.scancode, 0);
+        return;
+    }
 
     if (keyboardToMsx) {
         platformKeyEvent(key.scancode, key.down);
@@ -500,15 +521,29 @@ static void testRun()
             testPush(ev);
         }
         else if (st.cmd == "key") {
-            SDL_Scancode sc = SDL_GetScancodeFromName(st.a.c_str());
+            /* "F10", or with modifiers: "Ctrl+Shift+F9". */
+            std::string name = st.a;
+            SDL_Keymod mod = SDL_KMOD_NONE;
+            for (;;) {
+                size_t plus = name.find('+');
+                if (plus == std::string::npos || plus + 1 >= name.size()) break;
+                std::string m = name.substr(0, plus);
+                if (m == "Ctrl") mod |= SDL_KMOD_LCTRL;
+                else if (m == "Shift") mod |= SDL_KMOD_LSHIFT;
+                else if (m == "Alt") mod |= SDL_KMOD_LALT;
+                name = name.substr(plus + 1);
+            }
+            SDL_Scancode sc = SDL_GetScancodeFromName(name.c_str());
             ev.type = SDL_EVENT_KEY_DOWN;
             ev.key.windowID = wid;
+            ev.key.mod = mod;
             ev.key.scancode = sc;
             ev.key.key = SDL_GetKeyFromScancode(sc, SDL_KMOD_NONE, false);
             ev.key.down = true;
             testPush(ev);
             ev.type = SDL_EVENT_KEY_UP;
             ev.key.down = false;
+            ev.key.mod = SDL_KMOD_NONE;     /* the modifiers are let go too */
             testPush(ev);
         }
         else if (st.cmd == "text") {
@@ -555,7 +590,7 @@ static void frame()
     drawNotifications();
 
     /* The MSX gets the keyboard unless an ImGui window wants it. */
-    setKeyboardToMsx(!ImGui::GetIO().WantCaptureKeyboard);
+    setKeyboardToMsx(!ImGui::GetIO().WantCaptureKeyboard && !debuggerWantsKeys());
 
     /* Fullscreen: hide an idle mouse pointer. */
     if (isFullscreen() && !mouseCaptured && SDL_GetTicks() - lastMouseMove > 2000 &&
@@ -662,6 +697,7 @@ int main(int argc, char** argv)
         }
     }
 
+    closeDebugger();
     platformShutdown();
     ImGui::DestroyContext();
 

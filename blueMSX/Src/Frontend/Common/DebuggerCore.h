@@ -56,6 +56,9 @@ private:
 ** The text is padded like the Windows debugger's (mnemonic column). */
 int disassemble(const Symbols& symbols, const uint8_t* memory, uint16_t pc, std::string& text);
 
+/* English or Spanish, after the emulator's language. */
+const char* text(const char* english, const char* spanish);
+
 struct Breakpoint {
     enum Type { CODE, MEMORY, VRAM, IO };
     enum Condition { ANY, EQUALS, NOT_EQUALS, LESS_THAN, GREATER_THAN };    /* = DbgWatchpointCondition */
@@ -177,6 +180,19 @@ public:
     int  find(int view, const std::string& what, int from) const;
     /* A label, "#1234", "$1234", "1234h" or plain hex; -1 if neither. */
     int  parseAddress(const std::string& text) const;
+
+    /* ---- Ready-made rows for the panels -------------------------------- */
+    struct StackEntry { uint16_t address, value; bool changed; };
+    std::vector<StackEntry> stackEntries(int max = 128) const;
+    /* Newest first. `from` is the call (or rst) that pushed `ret`; an
+    ** address no call pushed came from an interrupt. */
+    struct CallEntry { uint16_t ret, from; bool interrupt; std::string text; };
+    std::vector<CallEntry> callEntries() const;
+    /* Flags as buttons: S Z Y H X P N C, or the assembler's conditions
+    ** NZ/Z NC/C PO/PE P/M DI/EI (the last one is IFF1/IFF2). */
+    struct Flag { std::string name; bool on; };
+    std::vector<Flag> flags(bool asmStyle) const;
+    void toggleFlag(int index, bool asmStyle);
 
     /* Events from the core beyond the state (BASIC "set breakpoint" calls,
     ** trace output). */
