@@ -14,6 +14,10 @@
 **   click X Y      left click at X,Y of the active window (logical pixels)
 **   combo N TEXT   choose the first item starting with TEXT in the Nth
 **                  visible combo box of the active window (from 0)
+**   shortcut SEQ   trigger the action of the active window bound to SEQ
+**                  (F10, Ctrl+B... as QKeySequence spells it) or titled SEQ
+**   focus NAME     give the keyboard focus to the widget named NAME
+**   tab TEXT       show the tab titled TEXT (tab widgets, tabbed docks)
 **   snap FILE      save the active window (dialog, popup or main) as an image
 **   snapgl FILE    save what the emulated screen widget shows
 **   render CAP MP4 render a replay to video (Create video clip, no file dialogs)
@@ -36,6 +40,7 @@
 #include <QMenu>
 #include <QMenuBar>
 #include <QMouseEvent>
+#include <QTabBar>
 #include <QTimer>
 
 #include <SDL3/SDL.h>
@@ -149,6 +154,7 @@ static void run(const Step& st)
         QPoint pos(xy.value(0).toInt(), xy.value(1).toInt());
         QWidget* target = top->childAt(pos);
         if (target == NULL) target = top;
+        if (getenv("BLUEMSX_TEST_VERBOSE")) fprintf(stderr, "test: click on %s\n", target->metaObject()->className());
         QPointF local = target->mapFrom(top, pos);
         QPointF global = target->mapToGlobal(local);
         QMouseEvent press(QEvent::MouseButtonPress, local, global, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
@@ -171,6 +177,36 @@ static void run(const Step& st)
             Q_EMIT box->activated(i);
             break;
         }
+    }
+    else if (st.cmd == "shortcut") {
+        QKeySequence seq(st.arg);
+        bool found = false;
+        for (QAction* a : activeWindow()->findChildren<QAction*>()) {
+            if (a->shortcut() == seq || a->text().remove('&') == st.arg) {
+                if (a->isEnabled()) QTimer::singleShot(0, a, &QAction::trigger);   /* may open a modal dialog */
+                else fprintf(stderr, "test: %s is disabled\n", st.arg.toUtf8().constData());
+                found = true;
+                break;
+            }
+        }
+        if (!found) fprintf(stderr, "test: no action for %s\n", st.arg.toUtf8().constData());
+    }
+    else if (st.cmd == "focus") {
+        QWidget* w = activeWindow()->findChild<QWidget*>(st.arg);
+        if (w) w->setFocus(Qt::OtherFocusReason);
+        else fprintf(stderr, "test: no widget %s\n", st.arg.toUtf8().constData());
+    }
+    else if (st.cmd == "tab") {
+        bool found = false;
+        for (QTabBar* bar : activeWindow()->findChildren<QTabBar*>()) {
+            for (int i = 0; i < bar->count() && !found; i++) {
+                if (bar->tabText(i).remove('&') == st.arg) {
+                    bar->setCurrentIndex(i);
+                    found = true;
+                }
+            }
+        }
+        if (!found) fprintf(stderr, "test: no tab %s\n", st.arg.toUtf8().constData());
     }
     else if (st.cmd == "snap") {
         QWidget* w = activeWindow();

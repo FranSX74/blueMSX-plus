@@ -466,6 +466,7 @@ void openDialog(FrontendDialog dialog, int arg)
     case FRONTEND_DIALOG_SHORTCUTS:    openShortcutEditor(); break;
     case FRONTEND_DIALOG_MIXER:        openMixer(); break;
     case FRONTEND_DIALOG_RENDER_VIDEO: openRenderProgress(); break;
+    case FRONTEND_DIALOG_DEBUGGER:     openDebugger(); break;
     default:
         if (mainWindow()) mainWindow()->screen()->showNotice("Not available yet in QblueMSX");
         break;

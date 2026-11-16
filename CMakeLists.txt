@@ -183,7 +183,8 @@ function(bluemsx_frontend target)
 endfunction()
 
 # Toolkit-neutral pieces the full frontends share (menu contents).
-set(BMX_FRONTEND_COMMON ${BMX}/Src/Frontend/Common/FrontendMenus.cpp)
+set(BMX_FRONTEND_COMMON ${BMX}/Src/Frontend/Common/FrontendMenus.cpp
+    ${BMX}/Src/Frontend/Common/DebuggerCore.cpp)
 
 if(BLUEMSX_FRONTEND_SDL)
     bluemsx_frontend(bluemsx-sdl ${BMX}/Src/Frontend/Sdl/SdlMain.c)
@@ -212,7 +213,7 @@ if(BLUEMSX_FRONTEND_QT)
     bluemsx_frontend(qbluemsx ${BMX_FRONTEND_COMMON}
         ${BMX_QT}/QtApp.h ${BMX_QT}/QtMain.cpp ${BMX_QT}/QtKeymap.cpp ${BMX_QT}/QtDialogs.cpp
         ${BMX_QT}/QtTest.cpp ${BMX_QT}/QtTheme.cpp
-        ${BMX_QT}/QtProperties.cpp ${BMX_QT}/QtShortcuts.cpp ${BMX_QT}/QtScreenGL.cpp)
+        ${BMX_QT}/QtProperties.cpp ${BMX_QT}/QtShortcuts.cpp ${BMX_QT}/QtScreenGL.cpp ${BMX_QT}/QtDebugger.cpp)
     set_target_properties(qbluemsx PROPERTIES AUTOMOC ON)
     # The core has a field named "slots": keep Qt keywords as Q_SLOTS, Q_EMIT...
     target_compile_definitions(qbluemsx PRIVATE QT_NO_KEYWORDS)

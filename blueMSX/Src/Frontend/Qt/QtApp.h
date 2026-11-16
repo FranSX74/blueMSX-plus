@@ -173,6 +173,7 @@ int  chooseFile(const FrontendFileRequest* req, char* out, int outSize);
 int  chooseFromList(FrontendListRequest* req);
 void showMessage(FrontendMessageKind kind, const QString& text);
 void openDialog(FrontendDialog dialog, int arg);
+void openDebugger();
 /* Brings open dialogs in step with the properties (after menus, shortcuts). */
 void refreshDialogs();
 
