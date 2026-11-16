@@ -545,6 +545,9 @@ int main(int argc, char** argv)
     hooks.chooseFile     = chooseFile;
     hooks.chooseFromList = chooseFromList;
     hooks.menuStripHeight = hookMenuStripHeight;
+    hooks.recordFrame    = []() {
+        post([]() { if (theWindow) theWindow->screen()->shadeReplayFrames(); });
+    };
 
     /* Qt has parsed its own options out of argv by now. */
     int rc = platformInit(argc, argv, &hooks);

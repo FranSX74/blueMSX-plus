@@ -527,6 +527,10 @@ void platformDisplayDone(void)
 
 int archUpdateEmuDisplay(int synchronous)
 {
+    /* A replay rendering to video takes the frames itself. */
+    if (platformReplayRendering()) {
+        return 1;
+    }
     if (SDL_GetAtomicInt(&pendingDisplay) > 1 || hooks.displayUpdate == NULL) {
         return 1;
     }

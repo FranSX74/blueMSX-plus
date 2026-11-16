@@ -12,6 +12,7 @@
 ** (at your option) any later version.
 ******************************************************************************
 */
+#include "PlatformInternal.h"
 #include "ArchSound.h"
 #include "AudioMixer.h"
 
@@ -39,12 +40,27 @@ static Int32 soundWrite(void* ref, Int16* buffer, UInt32 count)
     return 0;
 }
 
+/* While a replay renders to video the mix goes to the encoder only. */
+static MixerWriteCallback redirect;
+
+void platformSoundRedirect(MixerWriteCallback callback)
+{
+    redirect = callback;
+}
+
 void archSoundCreate(Mixer* mixer, UInt32 sampleRate, UInt32 bufferSize, Int16 channels)
 {
     SDL_AudioSpec spec;
     int fragmentFrames = 256;
 
     archSoundDestroy();
+
+    if (redirect != NULL) {
+        snd.mixer = mixer;
+        mixerSetStereo(mixer, 1);
+        mixerSetWriteCallback(mixer, redirect, NULL, 512);
+        return;
+    }
 
     if (!SDL_InitSubSystem(SDL_INIT_AUDIO)) {
         SDL_Log("blueMSX+: audio init failed: %s", SDL_GetError());
@@ -87,6 +103,9 @@ void archSoundCreate(Mixer* mixer, UInt32 sampleRate, UInt32 bufferSize, Int16 c
 
 void archSoundDestroy(void)
 {
+    if (snd.stream == NULL && snd.mixer != NULL) {
+        mixerSetWriteCallback(snd.mixer, NULL, NULL, 0);     /* redirected */
+    }
     if (snd.stream != NULL) {
         if (snd.mixer != NULL) {
             mixerSetWriteCallback(snd.mixer, NULL, NULL, 0);

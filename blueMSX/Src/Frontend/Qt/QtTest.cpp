@@ -14,6 +14,7 @@
 **   click X Y      left click at X,Y of the active window (logical pixels)
 **   snap FILE      save the active window (dialog, popup or main) as an image
 **   snapgl FILE    save what the emulated screen widget shows
+**   render CAP MP4 render a replay to video (Create video clip, no file dialogs)
 **   quit
 **
 ** This program is free software; you can redistribute it and/or modify
@@ -160,6 +161,12 @@ static void run(const Step& st)
     }
     else if (st.cmd == "snapgl") {
         mainWindow()->screen()->grabFramebuffer().save(st.arg);
+    }
+    else if (st.cmd == "render") {
+        QStringList files = st.arg.split(' ');
+        if (platformReplayRenderStart(files.value(0).toUtf8().constData(), files.value(1).toUtf8().constData())) {
+            openDialog(FRONTEND_DIALOG_RENDER_VIDEO, 0);
+        }
     }
     else if (st.cmd == "quit") {
         QApplication::closeAllWindows();

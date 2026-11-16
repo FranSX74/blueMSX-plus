@@ -48,7 +48,8 @@ typedef enum {
     FRONTEND_DIALOG_MIXER,
     FRONTEND_DIALOG_DEBUGGER,
     FRONTEND_DIALOG_TRAINER,
-    FRONTEND_DIALOG_MACHINE_EDITOR
+    FRONTEND_DIALOG_MACHINE_EDITOR,
+    FRONTEND_DIALOG_RENDER_VIDEO     /* progress of a replay to video */
 } FrontendDialog;
 
 typedef enum {
@@ -142,6 +143,11 @@ typedef struct FrontendHooks {
     /* Height of the frontend's menu bar, for themes that lay their artwork
     ** out below it (archMenuStripHeight). */
     int  (*menuStripHeight)(void);
+
+    /* [emulator] While a replay renders to video: a frame waits for the
+    ** frontend's shader (platformRecorderTakeFrame on the UI thread). NULL:
+    ** the software frame is recorded. */
+    void (*recordFrame)(void);
 } FrontendHooks;
 
 #ifdef __cplusplus

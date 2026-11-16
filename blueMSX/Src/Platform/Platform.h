@@ -87,6 +87,19 @@ int  platformRecorderPostRender(void);
 ** bottom-up image (pass the address of the top row). */
 void platformRecorderAddFrame(const void* pixels, int width, int height, int pitch, int format);
 
+/* Replay to video (File > Video capture > Create video clip). The frontend
+** shows FRONTEND_DIALOG_RENDER_VIDEO while it runs: progress 0..1000,
+** Done once the replay has ended, then Stop (cancelled: the user gave up). */
+int  platformReplayRenderStart(const char* capFile, const char* mp4File);
+int  platformReplayRendering(void);
+int  platformReplayRenderProgress(void);
+int  platformReplayRenderDone(void);
+void platformReplayRenderStop(int cancelled);
+/* Shader frontends, after the recordFrame hook (UI thread): take each frame
+** waiting, shade it at any size and give the result back. */
+int  platformRecorderTakeFrame(const void** pixels, int* width, int* height, int* pitch);
+void platformRecorderGiveFrame(const void* pixels, int width, int height, int pitch, int format);
+
 /* Tells the emulator the frame requested by displayUpdate was presented. */
 void platformDisplayDone(void);
 

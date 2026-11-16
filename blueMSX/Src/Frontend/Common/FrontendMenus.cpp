@@ -461,6 +461,10 @@ static void menuVideoCapture(MenuBuilder& b)
     b.separator();
     item(b, langMenuVideoLoad(), SC_VIDEO_CAP_LOAD, []() { actionVideoCaptureLoad(); });
     item(b, langMenuVideoPlay(), SC_VIDEO_CAP_PLAY, []() { actionVideoCapturePlay(); });
+    if (platformRecorderAvailable()) {
+        b.separator();
+        item(b, langMenuVideoRender(), SC_VIDEO_CAP_SAVE, []() { actionVideoCaptureSave(); });
+    }
 }
 
 static void sub(MenuBuilder& b, const std::string& label, const std::function<void()>& fill)

@@ -79,7 +79,6 @@ UInt16* archVideoInBufferGet(int width, int height) { return NULL; }
 void* archScreenCapture(ScreenCaptureType type, int* bitmapSize, int onlyBmp) { *bitmapSize = 0; return NULL; }
 void  archScreenCaptureAs(void) {}
 int   archScreenCaptureToFile(ScreenCaptureType type, const char* fname) { return 0; }
-void  archVideoCaptureSave(void) {}
 
 /* Debug hook */
 void archTrap(UInt8 value) {}

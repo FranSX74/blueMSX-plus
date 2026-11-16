@@ -32,7 +32,9 @@ extern "C" {
 #include <QTableWidget>
 #include <QLabel>
 #include <QListWidget>
+#include <QProgressBar>
 #include <QPushButton>
+#include <QTimer>
 #include <QMessageBox>
 #include <QUrl>
 #include <QVBoxLayout>
@@ -404,6 +406,53 @@ void refreshDialogs()
 
 /* ---- Dispatch ----------------------------------------------------------------------- */
 
+/* ---- Create video clip: progress of a replay rendering to MP4 ---------------- */
+
+static void openRenderProgress()
+{
+    auto* dlg = new QDialog(mainWindow());
+    dlg->setAttribute(Qt::WA_DeleteOnClose);
+    dlg->setWindowModality(Qt::ApplicationModal);
+    dlg->setWindowTitle(QString::fromUtf8(langMenuVideoRender()));
+    auto* layout = new QVBoxLayout(dlg);
+    auto* text = new QLabel;
+    auto* bar = new QProgressBar;
+    bar->setRange(0, 1000);
+    bar->setTextVisible(false);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Cancel);
+    buttons->button(QDialogButtonBox::Cancel)->setText(QString::fromUtf8(langDlgCancel()));
+    layout->addWidget(text);
+    layout->addWidget(bar);
+    layout->addWidget(buttons);
+    dlg->resize(420, dlg->sizeHint().height());
+
+    auto update = [dlg, text, bar]() {
+        if (platformReplayRenderDone()) {
+            platformReplayRenderStop(0);
+            dlg->close();
+            return;
+        }
+        int amount = platformReplayRenderProgress();
+        if (amount < 0) {
+            dlg->close();
+            return;
+        }
+        bar->setValue(amount);
+        text->setText(QString("%1 %2.%3%").arg(QString::fromUtf8(langDlgAmountCompleted()))
+                          .arg(amount / 10).arg(amount % 10));
+    };
+    update();
+    auto* timer = new QTimer(dlg);
+    QObject::connect(timer, &QTimer::timeout, dlg, update);
+    /* Cancel and the window's close button: stop, keep what was written. */
+    QObject::connect(dlg, &QDialog::finished, [](int) {
+        if (platformReplayRendering()) platformReplayRenderStop(1);
+    });
+    QObject::connect(buttons, &QDialogButtonBox::rejected, dlg, &QDialog::reject);
+    timer->start(100);
+    dlg->show();
+}
+
 void openDialog(FrontendDialog dialog, int arg)
 {
     switch (dialog) {
@@ -416,6 +465,7 @@ void openDialog(FrontendDialog dialog, int arg)
     case FRONTEND_DIALOG_CASSETTE_POS: openTape(); break;
     case FRONTEND_DIALOG_SHORTCUTS:    openShortcutEditor(); break;
     case FRONTEND_DIALOG_MIXER:        openMixer(); break;
+    case FRONTEND_DIALOG_RENDER_VIDEO: openRenderProgress(); break;
     default:
         if (mainWindow()) mainWindow()->screen()->showNotice("Not available yet in QblueMSX");
         break;

@@ -26,7 +26,7 @@ extern "C" {
 
 namespace app {
 
-static bool aboutOpen, languageOpen, tapeOpen, mixerOpen;
+static bool aboutOpen, languageOpen, tapeOpen, mixerOpen, renderOpen;
 static bool tapeSuspended;
 
 /* ---- Notices ---------------------------------------------------------------- */
@@ -338,14 +338,46 @@ void openDialog(FrontendDialog dialog, int arg)
         break;
     case FRONTEND_DIALOG_SHORTCUTS:    openShortcutEditor(); break;
     case FRONTEND_DIALOG_MIXER:        mixerOpen = true; break;
+    case FRONTEND_DIALOG_RENDER_VIDEO: renderOpen = true; break;
     default:
         showMessage(FRONTEND_MESSAGE_INFO, "Not available in this version yet.");
         break;
     }
 }
 
+/* Create video clip: progress of a replay rendering to MP4. */
+static void drawRenderProgress()
+{
+    if (!renderOpen) return;
+    if (platformReplayRenderDone()) {
+        platformReplayRenderStop(0);
+        renderOpen = false;
+        return;
+    }
+    int amount = platformReplayRenderProgress();
+    if (amount < 0) {
+        renderOpen = false;
+        return;
+    }
+    ImGuiIO& io = ImGui::GetIO();
+    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f), ImGuiCond_Always,
+                            ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(ImGui::GetFontSize() * 24, 0));
+    if (ImGui::Begin(langMenuVideoRender(), NULL, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
+                                                 ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("%s %d.%d%%", langDlgAmountCompleted(), amount / 10, amount % 10);
+        ImGui::ProgressBar(amount / 1000.0f, ImVec2(-1, 0), "");
+        if (ImGui::Button(langDlgCancel())) {
+            platformReplayRenderStop(1);
+            renderOpen = false;
+        }
+    }
+    ImGui::End();
+}
+
 void drawDialogs()
 {
+    drawRenderProgress();
     drawProperties();
     drawShortcutEditor();
     drawAbout();

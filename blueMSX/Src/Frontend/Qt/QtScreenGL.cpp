@@ -257,17 +257,14 @@ bool ScreenWidget::drawWithShader()
     return true;
 }
 
-/* While recording: the frame through the shader at the recording size, read
-** back for the encoder. Runs once per emulated frame, window shown or not. */
-void ScreenWidget::recordShaderFrame()
+/* The current texture through the shader at the recording size, read back
+** (bottom-up rows) into recordPixels. The context must be current. */
+void ScreenWidget::shadeForRecording()
 {
     const int w = 1280, h = 960;
-    if (program == nullptr || !platformRecorderActive()) return;
-    makeCurrent();
     if (recordTarget == nullptr) {
         recordTarget = new QOpenGLFramebufferObject(w, h);
     }
-    uploadTexture();
     recordTarget->bind();
     glViewport(0, 0, w, h);
     glClearColor(0, 0, 0, 1);
@@ -277,9 +274,57 @@ void ScreenWidget::recordShaderFrame()
     glPixelStorei(GL_PACK_ALIGNMENT, 4);
     glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, recordPixels.data());
     recordTarget->release();
+}
+
+/* While recording: the frame through the shader. Runs once per emulated
+** frame, window shown or not. */
+void ScreenWidget::recordShaderFrame()
+{
+    if (program == nullptr || !platformRecorderActive()) return;
+    makeCurrent();
+    uploadTexture();
+    shadeForRecording();
     doneCurrent();
     /* GL rows run bottom-up: start at the top row with a negative pitch. */
-    platformRecorderAddFrame(recordPixels.data() + size_t(h - 1) * w * 4, w, h, -w * 4, PLATFORM_PIXELS_RGBA);
+    platformRecorderAddFrame(recordPixels.data() + size_t(959) * 1280 * 4, 1280, 960, -1280 * 4, PLATFORM_PIXELS_RGBA);
+}
+
+/* A replay rendering to video: shade the frames the emulator left waiting. */
+void ScreenWidget::shadeReplayFrames()
+{
+    if (program == nullptr) return;
+    const void* pixels;
+    int w, h, pitch;
+    /* One frame per call: the emulator posts once per queued frame, and
+    ** returning to the event loop keeps the progress dialog and Cancel alive. */
+    if (!platformRecorderTakeFrame(&pixels, &w, &h, &pitch)) return;
+    makeCurrent();
+    {
+        QImage source(static_cast<const uchar*>(pixels), w, h, pitch, QImage::Format_RGB32);
+        uploadImage(source);
+        shadeForRecording();
+        platformRecorderGiveFrame(recordPixels.data() + size_t(959) * 1280 * 4, 1280, 960, -1280 * 4,
+                                  PLATFORM_PIXELS_RGBA);
+    }
+    doneCurrent();
+    frameDirty = true;      /* the texture holds a replay frame now */
+}
+
+void ScreenWidget::uploadImage(const QImage& image)
+{
+    glBindTexture(GL_TEXTURE_2D, texture);
+    if (context()->isOpenGLES()) {
+        QImage rgba = image.convertToFormat(QImage::Format_RGBA8888);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, rgba.width(), rgba.height(), GL_RGBA, GL_UNSIGNED_BYTE,
+                        rgba.constBits());
+    }
+    else {
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, image.bytesPerLine() / 4);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image.width(), image.height(), GL_BGRA, GL_UNSIGNED_BYTE,
+                        image.constBits());
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+    }
 }
 
 void ScreenWidget::uploadTexture()
@@ -289,16 +334,7 @@ void ScreenWidget::uploadTexture()
 
     glBindTexture(GL_TEXTURE_2D, texture);
     if (frameDirty) {
-        if (context()->isOpenGLES()) {
-            QImage rgba = frame.convertToFormat(QImage::Format_RGBA8888);
-            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, rgba.width(), rgba.height(), GL_RGBA, GL_UNSIGNED_BYTE,
-                            rgba.constBits());
-        }
-        else {
-            glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, frame.width(), frame.height(), GL_BGRA, GL_UNSIGNED_BYTE,
-                            frame.constBits());
-        }
+        uploadImage(frame);
         frameDirty = false;
     }
     GLint texFilter = filter == P_D3D_SCALE_BILINEAR ? GL_LINEAR : GL_NEAREST;

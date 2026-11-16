@@ -411,6 +411,7 @@ static int boardCaptureArmRecording(void)
         cap.initStateSize = (int)fread(cap.initState, 1, sizeof(cap.initState), f);
         fclose(f);
     }
+    remove("cap.tmp");      /* the snapshot lives in cap.initState now */
 
     if (cap.initStateSize > 0) {
         rleEncStartEncode(cap.inputs, sizeof(cap.inputs), 0);

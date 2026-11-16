@@ -77,6 +77,11 @@ private:
     void uploadTexture();
     void drawPicture();
     void recordShaderFrame();
+    void shadeForRecording();
+    void uploadImage(const QImage& image);
+public:
+    void shadeReplayFrames();
+private:
 
     QImage frame;
     bool   frameDirty = true;
